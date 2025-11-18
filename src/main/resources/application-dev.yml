@@ -7,11 +7,19 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: none    # Flyway handles schema!
+      ddl-auto: validate  # IMPORTANT: Change from 'update' to 'validate'
+    show-sql: true
     properties:
       hibernate:
+        format_sql: true
         dialect: org.hibernate.dialect.PostgreSQLDialect
 
+  # Flyway Configuration
   flyway:
     enabled: true
     baseline-on-migrate: true
+    baseline-version: 0
+    locations: classpath:db/migration
+    sql-migration-suffixes: .sql
+    validate-on-migrate: true
+    out-of-order: false
