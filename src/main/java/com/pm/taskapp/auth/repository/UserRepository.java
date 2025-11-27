@@ -43,4 +43,11 @@ public interface UserRepository extends JpaRepository<User, UUID> {
      * Spring Data resolves the nested property `roles.name`.
      */
     Page<User> findAllByRoles_Name(String roleName, Pageable pageable);
+
+    // searching users by name or email
+    Page<User> findByEmailContainingIgnoreCaseOrNameContainingIgnoreCase(
+            String email,
+            String name,
+            Pageable pageable
+    );
 }

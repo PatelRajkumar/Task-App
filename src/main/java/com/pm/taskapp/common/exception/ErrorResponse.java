@@ -1,31 +1,58 @@
 package com.pm.taskapp.common.exception;
 
-import java.time.LocalDateTime;
+import com.fasterxml.jackson.annotation.JsonInclude;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.time.Instant;
 import java.util.Map;
 
+/**
+ * Standard error response structure for all API errors.
+ * Provides consistent error information across the application.
+ */
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public class ErrorResponse {
-    private LocalDateTime timestamp;
+
+    /**
+     * Timestamp when the error occurred
+     */
+    private Instant timestamp;
+
+    /**
+     * HTTP status code
+     */
     private int status;
+
+    /**
+     * HTTP status reason phrase (e.g., "Bad Request", "Unauthorized")
+     */
     private String error;
+
+    /**
+     * Human-readable error message
+     */
     private String message;
-    private Map<String, String> errors;
 
-    public ErrorResponse(int status, String error, String message) {
-        this.timestamp = LocalDateTime.now();
-        this.status = status;
-        this.error = error;
-        this.message = message;
-    }
+    /**
+     * Application-specific error code for client handling
+     */
+    private String errorCode;
 
-    public ErrorResponse(int status, String error, String message, Map<String, String> errors) {
-        this(status, error, message);
-        this.errors = errors;
-    }
-    public LocalDateTime getTimestamp() { return timestamp; }
-    public int getStatus() { return status; }
-    public String getError() { return error; }
-    public String getMessage() { return message; }
-    public Map<String, String> getErrors() { return errors; }
+    /**
+     * Request path that caused the error
+     */
+    private String path;
 
-
+    /**
+     * Additional error details (optional)
+     * Can contain validation errors, extra context, etc.
+     */
+    private Map<String, Object> details;
 }
