@@ -16,35 +16,11 @@ import org.springframework.context.annotation.Configuration;
  * Swagger/OpenAPI configuration for API documentation.
  */
 @Configuration
-@OpenAPIDefinition(
-    info = @Info(
-        title = "TaskApp Authentication API",
-        description = "REST API for authentication and user management in TaskApp",
-        version = "1.0.0",
-        contact = @Contact(
-            name = "TaskApp Team",
-            email = "support@taskapp.com",
-            url = "https://taskapp.com"
-        ),
-        license = @License(
-            name = "Apache 2.0",
-            url = "https://www.apache.org/licenses/LICENSE-2.0"
-        ),
-        termsOfService = "https://taskapp.com/terms"
-    ),
-    servers = {
+@OpenAPIDefinition(info = @Info(title = "TaskApp Authentication API", description = "REST API for authentication and user management  and Project Management in TaskApp", version = "1.0.0", contact = @Contact(name = "TaskApp Team", email = "support@taskapp.com", url = "https://taskapp.com"), license = @License(name = "Apache 2.0", url = "https://www.apache.org/licenses/LICENSE-2.0"), termsOfService = "https://taskapp.com/terms"), servers = {
         @Server(url = "http://localhost:8080", description = "Local Development Server"),
         @Server(url = "https://api.taskapp.com", description = "Production Server")
-    }
-)
-@SecurityScheme(
-    name = "bearerAuth",
-    description = "JWT Bearer Token Authentication",
-    scheme = "bearer",
-    type = SecuritySchemeType.HTTP,
-    bearerFormat = "JWT",
-    in = SecuritySchemeIn.HEADER
-)
+})
+@SecurityScheme(name = "bearerAuth", description = "JWT Bearer Token Authentication", scheme = "bearer", type = SecuritySchemeType.HTTP, bearerFormat = "JWT", in = SecuritySchemeIn.HEADER)
 public class SwaggerConfig {
 
     /**
@@ -92,6 +68,24 @@ public class SwaggerConfig {
                 .group("permission-management")
                 .displayName("Permission Management")
                 .pathsToMatch("/api/permissions/**")
+                .build();
+    }
+
+    @Bean
+    public GroupedOpenApi projectApi() {
+        return GroupedOpenApi.builder()
+                .group("project-management")
+                .displayName("Project Management")
+                .pathsToMatch("/api/projects/**")
+                .build();
+    }
+
+    @Bean
+    public GroupedOpenApi projectMemberApi() {
+        return GroupedOpenApi.builder()
+                .group("project-members")
+                .displayName("Project Members")
+                .pathsToMatch("/api/projects/*/members/**")
                 .build();
     }
 
