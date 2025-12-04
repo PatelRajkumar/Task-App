@@ -45,13 +45,13 @@ public class JwtAuthenticationEntryPoint implements AuthenticationEntryPoint {
         
         // Add specific error details based on exception type
         if (authException.getMessage().contains("expired")) {
-            errorDetails.put("error_code", "TOKEN_EXPIRED");
+            errorDetails.put("errorCode", "TOKEN_EXPIRED");
             errorDetails.put("message", "Your session has expired. Please login again.");
         } else if (authException.getMessage().contains("JWT")) {
-            errorDetails.put("error_code", "INVALID_TOKEN");
+            errorDetails.put("errorCode", "INVALID_TOKEN");
             errorDetails.put("message", "Invalid authentication token");
         } else {
-            errorDetails.put("error_code", "AUTHENTICATION_REQUIRED");
+            errorDetails.put("errorCode", "AUTHENTICATION_REQUIRED");
             errorDetails.put("message", "Full authentication is required to access this resource");
         }
         
