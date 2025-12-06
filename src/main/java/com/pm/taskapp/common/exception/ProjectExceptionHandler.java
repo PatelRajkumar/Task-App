@@ -10,7 +10,14 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
 
+import com.pm.taskapp.common.exception.ErrorResponse;
+import com.pm.taskapp.project.exception.InvalidRoleAssignmentException;
+import com.pm.taskapp.project.exception.LastOwnerRemovalException;
+import com.pm.taskapp.project.exception.ProjectAccessDeniedException;
 import com.pm.taskapp.project.exception.ProjectException;
+import com.pm.taskapp.project.exception.ProjectMemberAlreadyExistsException;
+import com.pm.taskapp.project.exception.ProjectMemberNotFoundException;
+import com.pm.taskapp.project.exception.ProjectNotFoundException;
 
 /**
  * Exception handler for project-related exceptions.
