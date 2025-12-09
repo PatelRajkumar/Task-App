@@ -17,6 +17,7 @@ import com.pm.taskapp.task.enums.IssuePriority;
 import com.pm.taskapp.task.enums.IssueStatus;
 import com.pm.taskapp.task.enums.IssueType;
 import com.pm.taskapp.task.exception.InvalidDueDateException;
+import com.pm.taskapp.task.exception.InvalidStatusTransitionException;
 import com.pm.taskapp.task.exception.IssueAccessDeniedException;
 import com.pm.taskapp.task.exception.IssueNotFoundException;
 import com.pm.taskapp.task.mapper.IssueMapper;
@@ -152,7 +153,7 @@ public class IssueServiceImpl implements IssueService {
 
         // 1. Find issue with relationships loaded (avoid N+1 queries)
         Issue issue = issueRepository.findByIdWithDetails(issueId)
-                .orElseThrow(() -> new IssueNotFoundException(issueId));
+                .orElseThrow(() -> IssueNotFoundException.byId(issueId));
 
         if (!projectMemberRepository.existsByProject_IdAndUser_Id(issue.getProject().getId(), currentUserId)) {
             throw new IssueAccessDeniedException("You don't have access to this issue");
@@ -167,7 +168,7 @@ public class IssueServiceImpl implements IssueService {
     public IssueResponseDTO getIssueByKey(String key, UUID currentUserId) {
         log.debug("Getting issue by Key: {} for user: {}", key, currentUserId);
 
-        Issue issue = issueRepository.findByKeyWithDetails(key).orElseThrow(() -> new IssueNotFoundException(key));
+        Issue issue = issueRepository.findByKeyWithDetails(key).orElseThrow(() -> IssueNotFoundException.byKey(key));
 
         if (!projectMemberRepository.existsByProject_IdAndUser_Id(issue.getProject().getId(), currentUserId)) {
             throw new IssueAccessDeniedException("You don't have access to this issue");
@@ -178,8 +179,98 @@ public class IssueServiceImpl implements IssueService {
     }
 
     @Override
-    public IssueResponseDTO updateIssue(UUID issueId, IssueUpdateRequestDTO requestDTO, UUID currentUserId) {
-        return null;
+    public IssueResponseDTO updateIssue(UUID issueId, UUID projectId, IssueUpdateRequestDTO requestDTO,
+            UUID currentUserId) {
+        log.info("Updating issue: {} in project: {} by user: {}", issueId, projectId, currentUserId);
+
+        // 1. Validate at least one field is being updated
+        if (!requestDTO.hasAtLeastOneField()) {
+            throw new IllegalArgumentException("At least one field must be provided for update");
+        }
+
+        // 2. fetch issue
+        Issue issue = issueRepository.findByIdWithDetails(issueId)
+                .orElseThrow(() -> IssueNotFoundException.byId(issueId));
+
+        // 3. Get current user
+        User currentUser = userRepository.findById(currentUserId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found with ID: " + currentUserId));
+
+        if (!canEditIssue(issue, currentUserId, projectId)) {
+            throw new IssueAccessDeniedException("You don't have access to edit issue");
+        }
+
+        // Validate due date (if provided)
+        if (requestDTO.getDueDate() != null && requestDTO.getDueDate().isBefore(LocalDate.now())) {
+            throw InvalidDueDateException.pastDate(requestDTO.getDueDate());
+        }
+
+        User newAssignee = null;
+        if (requestDTO.getAssigneeId() != null) {
+            newAssignee = userRepository.findById(requestDTO.getAssigneeId()).orElseThrow(
+                    () -> new IllegalArgumentException("Assignee not found with Id: " + requestDTO.getAssigneeId()));
+
+            if (!projectMemberRepository.existsByProject_IdAndUser_Id(projectId, requestDTO.getAssigneeId())) {
+                throw new IllegalArgumentException(
+                        "Assignee must be a project member. User " + requestDTO.getAssigneeId() +
+                                " is not a member of project " + projectId);
+            }
+        }
+
+        boolean hasChanges = false;
+
+        // Update fields
+        // Update title (tracked)
+        if (requestDTO.getTitle() != null && !requestDTO.getTitle().equals(issue.getTitle())) {
+            String oldTitle = issue.getTitle();
+            issue.setTitle(requestDTO.getTitle());
+            createHistoryRecord(issue, "title", oldTitle, requestDTO.getTitle(), currentUser);
+            hasChanges = true;
+        }
+
+        // Update priority (tracked)
+        if (requestDTO.getPriority() != null && !requestDTO.getPriority().equals(issue.getPriority())) {
+            IssuePriority oldPriority = issue.getPriority();
+            issue.setPriority(requestDTO.getPriority());
+            createHistoryRecord(issue, "priority", oldPriority.name(), requestDTO.getPriority().name(), currentUser);
+            hasChanges = true;
+        }
+
+        // Update assignee (tracked)
+        if (requestDTO.getAssigneeId() != null) {
+            User oldAssignee = issue.getAssignee();
+            String oldAssigneeName = oldAssignee != null ? oldAssignee.getName() : null;
+            String newAssigneeName = newAssignee != null ? newAssignee.getName() : null;
+
+            if (!isSameAssignee(oldAssignee, newAssignee)) {
+                issue.setAssignee(newAssignee);
+                createHistoryRecord(issue, "assignee", oldAssigneeName, newAssigneeName, currentUser);
+                hasChanges = true;
+
+                // Send email notification to new assignee
+                if (newAssignee != null) {
+                    // TODO: Send assignment email
+                    log.debug("TODO: Send assignment email to: {}", newAssignee.getEmail());
+                }
+            }
+        }
+        if (requestDTO.getDescription() != null) {
+
+            issue.setDescription(requestDTO.getDescription());
+            hasChanges = true;
+        }
+        if (requestDTO.getDueDate() != null) {
+
+            issue.setDueDate(requestDTO.getDueDate());
+            hasChanges = true;
+        }
+        if (hasChanges) {
+            issue = issueRepository.save(issue);
+            log.info("Issue {} updated successfully", issue.getKey());
+        } else {
+            log.debug("No changes detected for issue {}", issue.getKey());
+        }
+        return issueMapper.toResponseDTO(issue);
     }
 
     @Override
@@ -188,9 +279,65 @@ public class IssueServiceImpl implements IssueService {
     }
 
     @Override
-    public IssueResponseDTO updateIssueStatus(UUID issueId, IssueUpdateStatusRequestDTO requestDTO,
+    public IssueResponseDTO updateIssueStatus(UUID issueId, UUID projectId, IssueUpdateStatusRequestDTO requestDTO,
             UUID currentUserId) {
-        return null;
+        log.info("Updating issue status: {} by user: {}", issueId, currentUserId);
+
+        Issue issue = issueRepository.findByIdWithDetails(issueId)
+                .orElseThrow(() -> IssueNotFoundException.byId(issueId));
+
+        User currentUser = userRepository.findById(currentUserId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found with ID: " + currentUserId));
+
+        if (!canEditIssue(issue, currentUserId, projectId)) {
+            throw new IssueAccessDeniedException("You don't have access to edit issue");
+        }
+
+        IssueStatus oldStatus = issue.getStatus();
+        IssueStatus newStatus = requestDTO.getNewStatus();
+
+        if (oldStatus.equals(newStatus)) {
+            log.debug("Status unchanged for issue {}: already {}", issue.getKey(), oldStatus);
+            return issueMapper.toResponseDTO(issue);
+        }
+
+        try {
+            oldStatus.validateTransition(newStatus);
+        } catch (InvalidStatusTransitionException e) {
+            log.warn("Invalid status transition for issue {}: {} -> {}",
+                    issue.getKey(), oldStatus, newStatus);
+            throw e;
+        }
+
+        issue.setStatus(newStatus);
+
+        if (newStatus == IssueStatus.DONE) {
+            issue.setResolvedAt(Instant.now());
+            log.debug("Issue {} marked as resolved", issue.getKey());
+        } else if (oldStatus == IssueStatus.DONE) {
+            // Reopening issue - clear resolved timestamp
+            issue.setResolvedAt(null);
+            log.debug("Issue {} reopened, cleared resolved timestamp", issue.getKey());
+        }
+
+        createHistoryRecord(issue, "status", oldStatus.name(), newStatus.name(), currentUser);
+
+        // 10. Save issue
+        issue = issueRepository.save(issue);
+        log.info("Issue {} status updated: {} -> {}", issue.getKey(), oldStatus, newStatus);
+
+        // 11. Send email notifications when marked as DONE
+        if (newStatus == IssueStatus.DONE) {
+            // Notify reporter
+            log.debug("TODO: Send completion email to reporter: {}", issue.getReporter().getEmail());
+
+            // Notify assignee (if assigned and different from reporter)
+            if (issue.getAssignee() != null &&
+                    !issue.getAssignee().getId().equals(issue.getReporter().getId())) {
+                log.debug("TODO: Send completion email to assignee: {}", issue.getAssignee().getEmail());
+            }
+        }
+        return issueMapper.toResponseDTO(issue);
     }
 
     @Override
@@ -270,5 +417,45 @@ public class IssueServiceImpl implements IssueService {
     @Override
     public long countMyAssignedIssues(UUID currentUserId) {
         return 0;
+    }
+
+    private boolean canEditIssue(Issue issue, UUID userId, UUID projectId) {
+        // User is the reporter
+        if (issue.getReporter().getId().equals(userId)) {
+            return true;
+        }
+
+        // User is the assignee
+        if (issue.getAssignee() != null && issue.getAssignee().getId().equals(userId)) {
+            return true;
+        }
+
+        // User is project OWNER or ADMIN
+        return projectMemberRepository.findByProject_IdAndUser_Id(projectId, userId)
+                .map(member -> member.getRole().canEditProject()) // OWNER and ADMIN have this permission
+                .orElse(false);
+    }
+
+    /**
+     * Create a history record for tracked field changes.
+     */
+    private void createHistoryRecord(Issue issue, String field, String oldValue, String newValue, User changedBy) {
+        IssueHistory history = IssueHistory.builder()
+                .issue(issue)
+                .field(field)
+                .oldValue(oldValue)
+                .newValue(newValue)
+                .changedBy(changedBy)
+                .changedAt(Instant.now())
+                .build();
+        issueHistoryRepository.save(history);
+    }
+
+    private boolean isSameAssignee(User oldAssignee, User newAssignee) {
+        if (oldAssignee == null && newAssignee == null)
+            return true;
+        if (oldAssignee == null || newAssignee == null)
+            return false;
+        return oldAssignee.getId().equals(newAssignee.getId());
     }
 }

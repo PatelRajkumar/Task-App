@@ -23,7 +23,7 @@ import com.pm.taskapp.project.exception.ProjectNotFoundException;
  * Exception handler for project-related exceptions.
  * Handles all exceptions from the project module (com.pm.taskapp.project).
  */
-@RestControllerAdvice(basePackages = "com.pm.taskapp.project")
+@RestControllerAdvice
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public class ProjectExceptionHandler {
 

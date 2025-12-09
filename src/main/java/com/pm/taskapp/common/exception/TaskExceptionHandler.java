@@ -16,9 +16,9 @@ import com.pm.taskapp.task.exception.IssueException;
  * Exception handler for issue/task-related exceptions.
  * Handles all exceptions from the task module (com.pm.taskapp.task).
  */
-@RestControllerAdvice(basePackages = "com.pm.taskapp.task")
+@RestControllerAdvice
 @Order(Ordered.HIGHEST_PRECEDENCE)
-public class IssueExceptionHandler {
+public class TaskExceptionHandler {
 
     /**
      * Fallback handler for ALL IssueException subclasses.

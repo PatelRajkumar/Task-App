@@ -11,76 +11,79 @@ import java.util.UUID;
 
 /**
  * Service interface for issue/task management.
- * Handles CRUD operations, status workflows, assignments, search, and history tracking.
+ * Handles CRUD operations, status workflows, assignments, search, and history
+ * tracking.
  */
 public interface IssueService {
 
-    // ========== CRUD Operations ==========
+        // ========== CRUD Operations ==========
 
-    IssueResponseDTO createIssue(UUID projectId, IssueCreateRequestDTO requestDTO, UUID currentUserId);
+        IssueResponseDTO createIssue(UUID projectId, IssueCreateRequestDTO requestDTO, UUID currentUserId);
 
-    IssueResponseDTO getIssueById(UUID issueId, UUID currentUserId);
+        IssueResponseDTO getIssueById(UUID issueId, UUID currentUserId);
 
-    IssueResponseDTO getIssueByKey(String key, UUID currentUserId);
+        IssueResponseDTO getIssueByKey(String key, UUID currentUserId);
 
-    IssueResponseDTO updateIssue(UUID issueId, IssueUpdateRequestDTO requestDTO, UUID currentUserId);
+        IssueResponseDTO updateIssue(UUID issueId, UUID projectId, IssueUpdateRequestDTO requestDTO,
+                        UUID currentUserId);
 
-    void deleteIssue(UUID issueId, UUID currentUserId);
+        void deleteIssue(UUID issueId, UUID currentUserId);
 
-    // ========== Status Management ==========
+        // ========== Status Management ==========
 
-    IssueResponseDTO updateIssueStatus(UUID issueId, IssueUpdateStatusRequestDTO requestDTO, UUID currentUserId);
+        IssueResponseDTO updateIssueStatus(UUID issueId, UUID projectId, IssueUpdateStatusRequestDTO requestDTO,
+                        UUID currentUserId);
 
-    // ========== Assignment Management ==========
+        // ========== Assignment Management ==========
 
-    IssueResponseDTO assignIssue(UUID issueId, UUID assigneeId, UUID currentUserId);
+        IssueResponseDTO assignIssue(UUID issueId, UUID assigneeId, UUID currentUserId);
 
-    IssueResponseDTO unassignIssue(UUID issueId, UUID currentUserId);
+        IssueResponseDTO unassignIssue(UUID issueId, UUID currentUserId);
 
-    // ========== List & Search Operations ==========
+        // ========== List & Search Operations ==========
 
-    Page<IssueSummaryDTO> getProjectIssues(UUID projectId, UUID currentUserId, Pageable pageable);
+        Page<IssueSummaryDTO> getProjectIssues(UUID projectId, UUID currentUserId, Pageable pageable);
 
-    Page<IssueSummaryDTO> searchIssues(UUID projectId, String searchTerm, UUID currentUserId, Pageable pageable);
+        Page<IssueSummaryDTO> searchIssues(UUID projectId, String searchTerm, UUID currentUserId, Pageable pageable);
 
-    Page<IssueSummaryDTO> filterIssues(
-            UUID projectId,
-            IssueStatus status,
-            IssueType type,
-            IssuePriority priority,
-            UUID assigneeId,
-            UUID currentUserId,
-            Pageable pageable);
+        Page<IssueSummaryDTO> filterIssues(
+                        UUID projectId,
+                        IssueStatus status,
+                        IssueType type,
+                        IssuePriority priority,
+                        UUID assigneeId,
+                        UUID currentUserId,
+                        Pageable pageable);
 
-    // ========== User-Specific Queries ==========
+        // ========== User-Specific Queries ==========
 
-    Page<IssueSummaryDTO> getMyAssignedIssues(UUID currentUserId, Pageable pageable);
+        Page<IssueSummaryDTO> getMyAssignedIssues(UUID currentUserId, Pageable pageable);
 
-    Page<IssueSummaryDTO> getMyReportedIssues(UUID currentUserId, Pageable pageable);
+        Page<IssueSummaryDTO> getMyReportedIssues(UUID currentUserId, Pageable pageable);
 
-    Page<IssueSummaryDTO> getProjectIssuesByAssignee(
-            UUID projectId,
-            UUID assigneeId,
-            UUID currentUserId,
-            Pageable pageable);
+        Page<IssueSummaryDTO> getProjectIssuesByAssignee(
+                        UUID projectId,
+                        UUID assigneeId,
+                        UUID currentUserId,
+                        Pageable pageable);
 
-    Page<IssueSummaryDTO> getUnassignedIssues(UUID projectId, UUID currentUserId, Pageable pageable);
+        Page<IssueSummaryDTO> getUnassignedIssues(UUID projectId, UUID currentUserId, Pageable pageable);
 
-    // ========== Date-Based Queries ==========
+        // ========== Date-Based Queries ==========
 
-    Page<IssueSummaryDTO> getOverdueIssues(UUID projectId, UUID currentUserId, Pageable pageable);
+        Page<IssueSummaryDTO> getOverdueIssues(UUID projectId, UUID currentUserId, Pageable pageable);
 
-    Page<IssueSummaryDTO> getRecentlyUpdatedIssues(UUID projectId, UUID currentUserId, Pageable pageable);
+        Page<IssueSummaryDTO> getRecentlyUpdatedIssues(UUID projectId, UUID currentUserId, Pageable pageable);
 
-    // ========== History & Audit ==========
+        // ========== History & Audit ==========
 
-    Page<IssueHistoryResponseDTO> getIssueHistory(UUID issueId, UUID currentUserId, Pageable pageable);
+        Page<IssueHistoryResponseDTO> getIssueHistory(UUID issueId, UUID currentUserId, Pageable pageable);
 
-    Page<IssueHistoryResponseDTO> getProjectActivityHistory(UUID projectId, UUID currentUserId, Pageable pageable);
+        Page<IssueHistoryResponseDTO> getProjectActivityHistory(UUID projectId, UUID currentUserId, Pageable pageable);
 
-    // ========== Statistics & Counts ==========
+        // ========== Statistics & Counts ==========
 
-    long countProjectIssues(UUID projectId);
+        long countProjectIssues(UUID projectId);
 
-    long countMyAssignedIssues(UUID currentUserId);
+        long countMyAssignedIssues(UUID currentUserId);
 }

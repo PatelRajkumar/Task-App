@@ -5,6 +5,8 @@ import com.pm.taskapp.auth.security.UserPrincipal;
 import com.pm.taskapp.project.dto.response.ProjectResponseDTO;
 import com.pm.taskapp.task.dto.IssueCreateRequestDTO;
 import com.pm.taskapp.task.dto.IssueResponseDTO;
+import com.pm.taskapp.task.dto.IssueUpdateRequestDTO;
+import com.pm.taskapp.task.dto.IssueUpdateStatusRequestDTO;
 import com.pm.taskapp.task.service.IssueService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -31,23 +33,56 @@ import java.util.UUID;
 @SecurityRequirement(name = "bearerAuth")
 public class ProjectIssueController {
 
-    private final IssueService issueService;
+        private final IssueService issueService;
 
-    @PostMapping
-    @Operation(summary = "Create new issue")
-    @ApiResponses(value = {
-            @ApiResponse(
-                    responseCode = "201",
-                    description = "Issue created successfully",
-                    content = @Content(schema = @Schema(implementation = ProjectResponseDTO.class))
-            ),
-            @ApiResponse(responseCode = "400", description = "Invalid input data"),
-            @ApiResponse(responseCode = "401", description = "Unauthorized")
-    })
-    public ResponseEntity<IssueResponseDTO> createIssue(@Valid @RequestBody IssueCreateRequestDTO request, @PathVariable @Parameter(description = "Project ID") UUID projectId, @CurrentUser UserPrincipal currentUser) {
-        log.info("Creating issue '{}' of project '{}' by user '{}'",request.getTitle(), projectId, currentUser.getId());
+        @PostMapping
+        @Operation(summary = "Create new issue")
+        @ApiResponses(value = {
+                        @ApiResponse(responseCode = "201", description = "Issue created successfully", content = @Content(schema = @Schema(implementation = IssueResponseDTO.class))),
+                        @ApiResponse(responseCode = "400", description = "Invalid input data"),
+                        @ApiResponse(responseCode = "401", description = "Unauthorized")
+        })
+        public ResponseEntity<IssueResponseDTO> createIssue(@Valid @RequestBody IssueCreateRequestDTO request,
+                        @PathVariable @Parameter(description = "Project ID") UUID projectId,
+                        @CurrentUser UserPrincipal currentUser) {
+                log.info("Creating issue '{}' of project '{}' by user '{}'", request.getTitle(), projectId,
+                                currentUser.getId());
 
-        IssueResponseDTO issue = issueService.createIssue(projectId, request, currentUser.getId());
-        return ResponseEntity.status(HttpStatus.CREATED).body(issue);
-    }
+                IssueResponseDTO issue = issueService.createIssue(projectId, request, currentUser.getId());
+                return ResponseEntity.status(HttpStatus.CREATED).body(issue);
+        }
+
+        @PutMapping("/{issueId}")
+        @Operation(summary = "Update issue")
+        @ApiResponses(value = {
+                        @ApiResponse(responseCode = "200", description = "Issue updated successfully", content = @Content(schema = @Schema(implementation = IssueResponseDTO.class))),
+                        @ApiResponse(responseCode = "400", description = "Invalid input data"),
+                        @ApiResponse(responseCode = "401", description = "Unauthorized")
+        })
+        public ResponseEntity<IssueResponseDTO> updateIssue(
+                        @PathVariable @Parameter(description = "Issue ID") UUID issueId,
+                        @PathVariable @Parameter(description = "Project ID") UUID projectId,
+                        @Valid @RequestBody IssueUpdateRequestDTO requestDTO,
+                        @CurrentUser UserPrincipal currentUser) {
+                IssueResponseDTO issue = issueService.updateIssue(issueId, projectId, requestDTO, currentUser.getId());
+                return ResponseEntity.status(HttpStatus.OK).body(issue);
+        }
+
+        @PutMapping("/{issueId}/status")
+        @Operation(summary = "Update issue status")
+        @ApiResponses(value = {
+                        @ApiResponse(responseCode = "200", description = "Issue status updated successfully", content = @Content(schema = @Schema(implementation = IssueResponseDTO.class))),
+                        @ApiResponse(responseCode = "400", description = "Invalid input data"),
+                        @ApiResponse(responseCode = "401", description = "Unauthorized")
+        })
+        public ResponseEntity<IssueResponseDTO> updateIssueStatus(
+                        @PathVariable @Parameter(description = "Issue ID") UUID issueId,
+                        @PathVariable @Parameter(description = "Project ID") UUID projectId,
+                        @Valid @RequestBody IssueUpdateStatusRequestDTO requestDTO,
+                        @CurrentUser UserPrincipal currentUser) {
+                IssueResponseDTO issue = issueService.updateIssueStatus(issueId, projectId, requestDTO,
+                                currentUser.getId());
+                return ResponseEntity.status(HttpStatus.OK).body(issue);
+        }
+
 }
