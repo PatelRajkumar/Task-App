@@ -3,6 +3,8 @@ package com.pm.taskapp.task.exception;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.ResponseStatus;
 
+import java.util.UUID;
+
 @ResponseStatus(HttpStatus.FORBIDDEN)
 public class IssueAlreadyDeletedException extends IssueException{
     public IssueAlreadyDeletedException(String message){
@@ -19,4 +21,11 @@ public class IssueAlreadyDeletedException extends IssueException{
                 String.format("Issue %s has already been deleted", key)
         );
     }
+
+    public static IssueAlreadyDeletedException byId(UUID issueId) {
+        return new IssueAlreadyDeletedException(
+                String.format("Issue %s has already been deleted", issueId)
+        );
+    }
+
 }

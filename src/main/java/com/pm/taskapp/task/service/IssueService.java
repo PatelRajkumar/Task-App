@@ -27,7 +27,7 @@ public interface IssueService {
         IssueResponseDTO updateIssue(UUID issueId, UUID projectId, IssueUpdateRequestDTO requestDTO,
                         UUID currentUserId);
 
-        void deleteIssue(UUID issueId, UUID currentUserId);
+        void deleteIssue(UUID issueId, UUID projectId, UUID currentUserId);
 
         // ========== Status Management ==========
 
@@ -36,15 +36,13 @@ public interface IssueService {
 
         // ========== Assignment Management ==========
 
-        IssueResponseDTO assignIssue(UUID issueId, UUID assigneeId, UUID currentUserId);
-
-        IssueResponseDTO unassignIssue(UUID issueId, UUID currentUserId);
+        IssueResponseDTO assignIssue(UUID issueId, UUID projectId, IssueAssignRequestDTO requestDTO, UUID currentUserId);
 
         // ========== List & Search Operations ==========
 
-        Page<IssueSummaryDTO> getProjectIssues(UUID projectId, UUID currentUserId, Pageable pageable);
+        Page<IssueSummaryDTO> getProjectIssues(UUID projectId, Pageable pageable,UUID currentUserId);
 
-        Page<IssueSummaryDTO> searchIssues(UUID projectId, String searchTerm, UUID currentUserId, Pageable pageable);
+        Page<IssueSummaryDTO> searchIssues(UUID projectId, String searchTerm, Pageable pageable,UUID currentUserId);
 
         Page<IssueSummaryDTO> filterIssues(
                         UUID projectId,

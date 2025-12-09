@@ -16,10 +16,7 @@ import com.pm.taskapp.task.entity.IssueHistory;
 import com.pm.taskapp.task.enums.IssuePriority;
 import com.pm.taskapp.task.enums.IssueStatus;
 import com.pm.taskapp.task.enums.IssueType;
-import com.pm.taskapp.task.exception.InvalidDueDateException;
-import com.pm.taskapp.task.exception.InvalidStatusTransitionException;
-import com.pm.taskapp.task.exception.IssueAccessDeniedException;
-import com.pm.taskapp.task.exception.IssueNotFoundException;
+import com.pm.taskapp.task.exception.*;
 import com.pm.taskapp.task.mapper.IssueMapper;
 import com.pm.taskapp.task.repository.IssueHistoryRepository;
 import com.pm.taskapp.task.repository.IssueRepository;
@@ -274,10 +271,39 @@ public class IssueServiceImpl implements IssueService {
     }
 
     @Override
-    public void deleteIssue(UUID issueId, UUID currentUserId) {
+    @Transactional
+    public void deleteIssue(UUID issueId, UUID projectId, UUID currentUserId) {
+        log.info("Deleting issue: {} by user: {}", issueId, currentUserId);
 
+        // 1. Fetch issue
+        Issue issue = issueRepository.findByIdWithDetails(issueId)
+                .orElseThrow(() -> IssueNotFoundException.byId(issueId));
+
+        // 2. Check if already deleted
+        if (issue.isDeleted()) {
+            throw IssueAlreadyDeletedException.byKey(issue.getKey());
+        }
+
+        // 3. Check authorization
+        if (!canEditIssue(issue, currentUserId, projectId)) {
+            throw new IssueAccessDeniedException("You don't have access to edit issue");
+        }
+
+        // 4. Get current user (for deletedBy)
+        User currentUser = userRepository.findById(currentUserId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found with ID: " + currentUserId));
+
+        // 5. Soft delete
+        issue.setIsDeleted(true);
+        issue.setDeletedAt(Instant.now());
+        issue.setDeletedBy(currentUser);
+
+        createHistoryRecord(issue, "deleted", "false", "true", currentUser);
+
+        issueRepository.save(issue);
+
+        log.info("Issue deleted successfully: {}", issue.getKey());
     }
-
     @Override
     public IssueResponseDTO updateIssueStatus(UUID issueId, UUID projectId, IssueUpdateStatusRequestDTO requestDTO,
             UUID currentUserId) {
@@ -341,24 +367,141 @@ public class IssueServiceImpl implements IssueService {
     }
 
     @Override
-    public IssueResponseDTO assignIssue(UUID issueId, UUID assigneeId, UUID currentUserId) {
-        return null;
+    @Transactional
+    public IssueResponseDTO assignIssue(UUID issueId, UUID projectId, IssueAssignRequestDTO requestDTO, UUID currentUserId) {
+        UUID assigneeId = requestDTO.getAssigneeId();
+
+        if (assigneeId == null) {
+            log.info("Unassigning issue: {} by user: {}", issueId, currentUserId);
+        } else {
+            log.info("Assigning issue: {} to user: {} by user: {}", issueId, assigneeId, currentUserId);
+        }
+
+        // 1. Fetch issue
+        Issue issue = issueRepository.findByIdWithDetails(issueId)
+                .orElseThrow(() -> IssueNotFoundException.byId(issueId));
+
+        // 2. Check if already deleted
+        if (issue.isDeleted()) {
+            throw IssueAlreadyDeletedException.byKey(issue.getKey());
+        }
+
+        // 3. Check authorization
+        if (!canEditIssue(issue, currentUserId, projectId)) {
+            throw new IssueAccessDeniedException("You don't have access to edit issue");
+        }
+
+        // 4. Get current user (for history tracking)
+        User currentUser = userRepository.findById(currentUserId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found with ID: " + currentUserId));
+
+        User oldAssignee = issue.getAssignee();
+
+        // 5. Handle UNASSIGNMENT (assigneeId is null)
+        if (assigneeId == null) {
+            if (oldAssignee == null) {
+                log.debug("Issue {} is already unassigned", issue.getKey());
+                return issueMapper.toResponseDTO(issue);
+            }
+
+            // Unassign
+            issue.setAssignee(null);
+            createHistoryRecord(
+                    issue,
+                    "assignee",
+                    oldAssignee.getName(),
+                    null,
+                    currentUser
+            );
+
+            issue = issueRepository.save(issue);
+            log.info("Issue {} unassigned successfully", issue.getKey());
+
+            return issueMapper.toResponseDTO(issue);
+        }
+
+        // 6. Handle ASSIGNMENT (assigneeId is provided)
+
+        // Fetch and validate new assignee
+        User newAssignee = userRepository.findById(assigneeId)
+                .orElseThrow(() -> new IllegalArgumentException("Assignee not found with ID: " + assigneeId));
+
+        // Validate assignee is project member
+        if (!projectMemberRepository.existsByProject_IdAndUser_Id(projectId, assigneeId)) {
+            throw new IllegalArgumentException(
+                    "Assignee must be a project member. User " + assigneeId +
+                            " is not a member of project " + projectId);
+        }
+
+        // Check if already assigned to same user (early exit)
+        if (isSameAssignee(oldAssignee, newAssignee)) {
+            log.debug("Issue {} already assigned to user {}", issue.getKey(), assigneeId);
+            return issueMapper.toResponseDTO(issue);
+        }
+
+        // Update assignee
+        issue.setAssignee(newAssignee);
+
+        // Create history record
+        createHistoryRecord(
+                issue,
+                "assignee",
+                oldAssignee != null ? oldAssignee.getName() : null,
+                newAssignee.getName(),
+                currentUser
+        );
+
+        // Save
+        issue = issueRepository.save(issue);
+
+        // Send email notification
+        log.debug("TODO: Send assignment email to: {}", newAssignee.getEmail());
+
+        log.info("Issue {} assigned successfully to {}", issue.getKey(), newAssignee.getEmail());
+
+        return issueMapper.toResponseDTO(issue);
+    }
+
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<IssueSummaryDTO> getProjectIssues(UUID projectId, Pageable pageable,UUID currentUserId) {
+        log.info("Getting all issues of project: {} for user: {}", projectId, currentUserId);
+        // 1. Validate project exists
+        projectRepository.findById(projectId)
+                .orElseThrow(() -> ProjectNotFoundException.byId(projectId));
+
+        // 2. Check user is project member (authorization)
+        if (!projectMemberRepository.existsByProject_IdAndUser_Id(projectId, currentUserId)) {
+            throw new IssueAccessDeniedException("You don't have access to this project's issues");
+        }
+
+
+        Page<Issue> issues = issueRepository.findByProject(projectId,pageable);
+        return issues.map(issue -> issueMapper.toSummaryDTO(issue));
     }
 
     @Override
-    public IssueResponseDTO unassignIssue(UUID issueId, UUID currentUserId) {
-        return null;
-    }
+    @Transactional(readOnly = true)
+    public Page<IssueSummaryDTO> searchIssues(UUID projectId, String searchTerm,Pageable pageable, UUID currentUserId
+            ) {
+        log.info("Search issue in project: {} for user: {}",projectId,currentUserId);
 
-    @Override
-    public Page<IssueSummaryDTO> getProjectIssues(UUID projectId, UUID currentUserId, Pageable pageable) {
-        return null;
-    }
+         projectRepository.findById(projectId)
+                .orElseThrow(() -> ProjectNotFoundException.byId(projectId));
 
-    @Override
-    public Page<IssueSummaryDTO> searchIssues(UUID projectId, String searchTerm, UUID currentUserId,
-            Pageable pageable) {
-        return null;
+        // 2. Check user is project member (authorization)
+        if (!projectMemberRepository.existsByProject_IdAndUser_Id(projectId, currentUserId)) {
+            throw new IssueAccessDeniedException("You don't have access to this project's issues");
+        }
+        // 3. Handle empty search term (return all issues)
+        if (searchTerm == null || searchTerm.trim().isEmpty()) {
+            log.debug("Empty search term, returning all issues");
+            return getProjectIssues(projectId, pageable, currentUserId);
+        }
+        String normalizedSearchTerm = searchTerm.trim();
+        Page<Issue> issues = issueRepository.searchInProject(projectId,normalizedSearchTerm,pageable);
+        return issues.map(issue -> issueMapper.toSummaryDTO(issue));
     }
 
     @Override

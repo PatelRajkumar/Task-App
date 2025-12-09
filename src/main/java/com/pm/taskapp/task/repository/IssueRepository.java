@@ -123,6 +123,7 @@ public interface IssueRepository extends JpaRepository<Issue, UUID> {
      * @param pageable Pagination and sorting parameters
      * @return Page of active issues
      */
+    @EntityGraph(attributePaths = {"assignee", "reporter", "project"})
     @Query("SELECT i FROM Issue i " +
             "WHERE i.project.id = :projectId " +
             "AND i.isDeleted = false " +
@@ -311,6 +312,7 @@ public interface IssueRepository extends JpaRepository<Issue, UUID> {
      * @param pageable Pagination and sorting parameters
      * @return Page of matching issues
      */
+    @EntityGraph(attributePaths = {"assignee", "reporter", "project"})
     @Query("SELECT i FROM Issue i " +
             "WHERE i.project.id = :projectId " +
             "AND (LOWER(i.title) LIKE LOWER(CONCAT('%', :searchTerm, '%')) " +
