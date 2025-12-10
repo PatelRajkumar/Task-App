@@ -45,6 +45,7 @@ public class IssueSummaryDTO {
     private UserSummaryDTO assignee;  // Just assignee, not reporter
     private LocalDate dueDate;
     private Instant createdAt;
+    private Instant updatedAt;
 
     /**
      * Check if issue is overdue.

@@ -62,6 +62,7 @@ public class IssueMapper {
                 .assignee(projectMapper.toUserSummaryDTO(issue.getAssignee()))
                 .dueDate(issue.getDueDate())
                 .createdAt(issue.getCreatedAt())
+                .updatedAt(issue.getUpdatedAt())
                 .build();
     }
 }

@@ -7,6 +7,7 @@ import com.pm.taskapp.task.enums.IssueType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
+import java.time.LocalDate;
 import java.util.UUID;
 
 /**
@@ -50,6 +51,7 @@ public interface IssueService {
                         IssueType type,
                         IssuePriority priority,
                         UUID assigneeId,
+                        UUID reporterId,
                         UUID currentUserId,
                         Pageable pageable);
 
@@ -59,17 +61,11 @@ public interface IssueService {
 
         Page<IssueSummaryDTO> getMyReportedIssues(UUID currentUserId, Pageable pageable);
 
-        Page<IssueSummaryDTO> getProjectIssuesByAssignee(
-                        UUID projectId,
-                        UUID assigneeId,
-                        UUID currentUserId,
-                        Pageable pageable);
-
         Page<IssueSummaryDTO> getUnassignedIssues(UUID projectId, UUID currentUserId, Pageable pageable);
 
         // ========== Date-Based Queries ==========
 
-        Page<IssueSummaryDTO> getOverdueIssues(UUID projectId, UUID currentUserId, Pageable pageable);
+        Page<IssueSummaryDTO> getOverdueIssues(UUID projectId, UUID currentUserId,LocalDate asOfDate, Pageable pageable);
 
         Page<IssueSummaryDTO> getRecentlyUpdatedIssues(UUID projectId, UUID currentUserId, Pageable pageable);
 

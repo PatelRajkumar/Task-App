@@ -18,6 +18,7 @@ import com.pm.taskapp.task.enums.IssueStatus;
 import com.pm.taskapp.task.enums.IssueType;
 import com.pm.taskapp.task.exception.*;
 import com.pm.taskapp.task.mapper.IssueMapper;
+import com.pm.taskapp.task.mapper.IssueHistoryMapper;
 import com.pm.taskapp.task.repository.IssueHistoryRepository;
 import com.pm.taskapp.task.repository.IssueRepository;
 import org.springframework.data.domain.Page;
@@ -41,6 +42,7 @@ public class IssueServiceImpl implements IssueService {
     private final UserRepository userRepository;
     private final IssueRepository issueRepository;
     private final IssueMapper issueMapper;
+    private final IssueHistoryMapper issueHistoryMapper;
     private final ProjectRepository projectRepository;
     private final ProjectMemberRepository projectMemberRepository;
     private final ProjectIssueCounterRepository projectIssueCounterRepository;
@@ -304,6 +306,7 @@ public class IssueServiceImpl implements IssueService {
 
         log.info("Issue deleted successfully: {}", issue.getKey());
     }
+
     @Override
     public IssueResponseDTO updateIssueStatus(UUID issueId, UUID projectId, IssueUpdateStatusRequestDTO requestDTO,
             UUID currentUserId) {
@@ -368,7 +371,8 @@ public class IssueServiceImpl implements IssueService {
 
     @Override
     @Transactional
-    public IssueResponseDTO assignIssue(UUID issueId, UUID projectId, IssueAssignRequestDTO requestDTO, UUID currentUserId) {
+    public IssueResponseDTO assignIssue(UUID issueId, UUID projectId, IssueAssignRequestDTO requestDTO,
+            UUID currentUserId) {
         UUID assigneeId = requestDTO.getAssigneeId();
 
         if (assigneeId == null) {
@@ -411,8 +415,7 @@ public class IssueServiceImpl implements IssueService {
                     "assignee",
                     oldAssignee.getName(),
                     null,
-                    currentUser
-            );
+                    currentUser);
 
             issue = issueRepository.save(issue);
             log.info("Issue {} unassigned successfully", issue.getKey());
@@ -448,8 +451,7 @@ public class IssueServiceImpl implements IssueService {
                 "assignee",
                 oldAssignee != null ? oldAssignee.getName() : null,
                 newAssignee.getName(),
-                currentUser
-        );
+                currentUser);
 
         // Save
         issue = issueRepository.save(issue);
@@ -462,10 +464,9 @@ public class IssueServiceImpl implements IssueService {
         return issueMapper.toResponseDTO(issue);
     }
 
-
     @Override
     @Transactional(readOnly = true)
-    public Page<IssueSummaryDTO> getProjectIssues(UUID projectId, Pageable pageable,UUID currentUserId) {
+    public Page<IssueSummaryDTO> getProjectIssues(UUID projectId, Pageable pageable, UUID currentUserId) {
         log.info("Getting all issues of project: {} for user: {}", projectId, currentUserId);
         // 1. Validate project exists
         projectRepository.findById(projectId)
@@ -476,18 +477,18 @@ public class IssueServiceImpl implements IssueService {
             throw new IssueAccessDeniedException("You don't have access to this project's issues");
         }
 
-
-        Page<Issue> issues = issueRepository.findByProject(projectId,pageable);
+        Page<Issue> issues = issueRepository.findByProject(projectId, pageable);
         return issues.map(issue -> issueMapper.toSummaryDTO(issue));
     }
 
     @Override
     @Transactional(readOnly = true)
-    public Page<IssueSummaryDTO> searchIssues(UUID projectId, String searchTerm,Pageable pageable, UUID currentUserId
-            ) {
-        log.info("Search issue in project: {} for user: {}",projectId,currentUserId);
+    public Page<IssueSummaryDTO> searchIssues(UUID projectId, String searchTerm, Pageable pageable,
+            UUID currentUserId) {
 
-         projectRepository.findById(projectId)
+        log.info("Search issue in project: {} for user: {}", projectId, currentUserId);
+
+        projectRepository.findById(projectId)
                 .orElseThrow(() -> ProjectNotFoundException.byId(projectId));
 
         // 2. Check user is project member (authorization)
@@ -500,66 +501,207 @@ public class IssueServiceImpl implements IssueService {
             return getProjectIssues(projectId, pageable, currentUserId);
         }
         String normalizedSearchTerm = searchTerm.trim();
-        Page<Issue> issues = issueRepository.searchInProject(projectId,normalizedSearchTerm,pageable);
+        Page<Issue> issues = issueRepository.searchInProject(projectId, normalizedSearchTerm, pageable);
         return issues.map(issue -> issueMapper.toSummaryDTO(issue));
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Page<IssueSummaryDTO> filterIssues(UUID projectId, IssueStatus status, IssueType type,
-            IssuePriority priority, UUID assigneeId, UUID currentUserId, Pageable pageable) {
-        return null;
+            IssuePriority priority, UUID assigneeId, UUID reporterId, UUID currentUserId, Pageable pageable) {
+
+        if (projectId != null) {
+            log.info("Filtering issues in project: {} for user: {}", projectId, currentUserId);
+
+            // 1. Validate project exists
+            projectRepository.findById(projectId)
+                    .orElseThrow(() -> ProjectNotFoundException.byId(projectId));
+
+            // 2. Validate user is project member (authorization)
+            if (!projectMemberRepository.existsByProject_IdAndUser_Id(projectId, currentUserId)) {
+                throw new IssueAccessDeniedException("You don't have access to this project's issues");
+            }
+        } else {
+            log.info("Filtering issues GLOBALLY for user: {} (across all accessible projects)", currentUserId);
+            // No explicit authorization needed - repository handles it via subquery
+        }
+
+        // 3. Use secure repository method (handles authorization for both cases)
+        Page<Issue> issues = issueRepository.findByFiltersWithUserAccess(
+                currentUserId, // ← Repository uses this to filter accessible projects
+                projectId, // ← Can be null for global search
+                status,
+                type,
+                priority,
+                assigneeId,
+                reporterId, // reporterId
+                pageable);
+
+        log.debug("Found {} issues matching filters", issues.getTotalElements());
+
+        return issues.map(issueMapper::toSummaryDTO);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Page<IssueSummaryDTO> getMyAssignedIssues(UUID currentUserId, Pageable pageable) {
-        return null;
+        log.info("Find All issues assigned to current user: {}", currentUserId);
+
+        // 1. Validate user exists (optional but recommended)
+        if (!userRepository.existsById(currentUserId)) {
+            throw new IllegalArgumentException("User not found with ID: " + currentUserId);
+        }
+
+        Page<Issue> issues = issueRepository.findByAssignee(currentUserId, pageable);
+        return issues.map(issueMapper::toSummaryDTO);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Page<IssueSummaryDTO> getMyReportedIssues(UUID currentUserId, Pageable pageable) {
-        return null;
+        log.info("Find All issues reported by current user: {}", currentUserId);
+
+        // 1. Validate user exists (optional but recommended)
+        if (!userRepository.existsById(currentUserId)) {
+            throw new IllegalArgumentException("User not found with ID: " + currentUserId);
+        }
+
+        Page<Issue> issues = issueRepository.findByReporter(currentUserId, pageable);
+        return issues.map(issueMapper::toSummaryDTO);
     }
 
     @Override
-    public Page<IssueSummaryDTO> getProjectIssuesByAssignee(UUID projectId, UUID assigneeId, UUID currentUserId,
-            Pageable pageable) {
-        return null;
-    }
-
-    @Override
+    @Transactional(readOnly = true)
     public Page<IssueSummaryDTO> getUnassignedIssues(UUID projectId, UUID currentUserId, Pageable pageable) {
-        return null;
+        log.info("Find all unassigned issues of project: {} for user: {}", projectId, currentUserId);
+
+        projectRepository.findById(projectId)
+                .orElseThrow(() -> ProjectNotFoundException.byId(projectId));
+
+        if (!projectMemberRepository.existsByProject_IdAndUser_Id(projectId, currentUserId)) {
+            throw new IssueAccessDeniedException("You don't have access to this project's issues");
+        }
+
+        Page<Issue> issues = issueRepository.findUnassignedByProject(projectId, pageable);
+
+        log.debug("Found {} unassigned issues in project: {}",
+                issues.getTotalElements(), projectId);
+
+        return issues.map(issueMapper::toSummaryDTO);
     }
 
     @Override
-    public Page<IssueSummaryDTO> getOverdueIssues(UUID projectId, UUID currentUserId, Pageable pageable) {
-        return null;
+    @Transactional(readOnly = true)
+    public Page<IssueSummaryDTO> getOverdueIssues(UUID projectId, UUID currentUserId, LocalDate asOfDate,
+            Pageable pageable) {
+        log.info("Find all overdue issues of project: {} for user: {}", projectId, currentUserId);
+
+        projectRepository.findById(projectId)
+                .orElseThrow(() -> ProjectNotFoundException.byId(projectId));
+
+        if (!projectMemberRepository.existsByProject_IdAndUser_Id(projectId, currentUserId)) {
+            throw new IssueAccessDeniedException("You don't have access to this project's issues");
+        }
+
+        LocalDate checkDate = asOfDate != null ? asOfDate : LocalDate.now();
+
+        Page<Issue> issues = issueRepository.findOverdueIssues(projectId, checkDate, pageable);
+
+        log.debug("Found all overdue issues of project: {} as of date: {}", projectId, asOfDate);
+        return issues.map(issueMapper::toSummaryDTO);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Page<IssueSummaryDTO> getRecentlyUpdatedIssues(UUID projectId, UUID currentUserId, Pageable pageable) {
-        return null;
+        log.info("Find all recently updated issues of project: {} for user: {}", projectId, currentUserId);
+
+        projectRepository.findById(projectId)
+                .orElseThrow(() -> ProjectNotFoundException.byId(projectId));
+
+        if (!projectMemberRepository.existsByProject_IdAndUser_Id(projectId, currentUserId)) {
+            throw new IssueAccessDeniedException("You don't have access to this project's issues");
+        }
+
+        Page<Issue> issues = issueRepository.findRecentlyUpdated(projectId, pageable);
+
+        log.debug("Found {} issues in project: {}, sorted by recent updates",
+                issues.getTotalElements(), projectId);
+        return issues.map(issueMapper::toSummaryDTO);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Page<IssueHistoryResponseDTO> getIssueHistory(UUID issueId, UUID currentUserId, Pageable pageable) {
-        return null;
+        log.info("Get History of issue: {} for user: {}", issueId, currentUserId);
+
+        if (!userRepository.existsById(currentUserId)) {
+            throw new IllegalArgumentException("User not found with ID: " + currentUserId);
+        }
+
+        Issue issue = issueRepository.findByIdWithDetails(issueId)
+                .orElseThrow(() -> IssueNotFoundException.byId(issueId));
+
+        if (!projectMemberRepository.existsByProject_IdAndUser_Id(issue.getProject().getId(), currentUserId)) {
+            throw new IssueAccessDeniedException("You don't have access to this issue's history");
+        }
+
+        Page<IssueHistory> issueHistory = issueHistoryRepository.findByIssue(issueId, pageable);
+
+        log.debug("Found {} history records for issue: {}", issueHistory.getTotalElements(), issue.getId());
+
+        return issueHistory.map(issueHistoryMapper::toResponseDTO);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Page<IssueHistoryResponseDTO> getProjectActivityHistory(UUID projectId, UUID currentUserId,
             Pageable pageable) {
-        return null;
+        log.info("Get History of all issues of project: {} for user: {}", projectId, currentUserId);
+
+        projectRepository.findById(projectId)
+                .orElseThrow(() -> ProjectNotFoundException.byId(projectId));
+
+        if (!projectMemberRepository.existsByProject_IdAndUser_Id(projectId, currentUserId)) {
+            throw new IssueAccessDeniedException("You don't have access to this project's issues");
+        }
+
+        Page<IssueHistory> issueHistory = issueHistoryRepository.findByProject(projectId, pageable);
+
+        log.debug("Found history of all issues of project: {}", projectId);
+
+        return issueHistory.map(issueHistoryMapper::toResponseDTO);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public long countProjectIssues(UUID projectId) {
-        return 0;
+        log.info("Get count of total issues in project: {}", projectId);
+
+        projectRepository.findById(projectId)
+                .orElseThrow(() -> ProjectNotFoundException.byId(projectId));
+
+        long count = issueRepository.countByProject(projectId);
+
+        log.debug("Project {} has {} issues", projectId, count);
+
+        return count;
     }
 
     @Override
+    @Transactional(readOnly = true)
     public long countMyAssignedIssues(UUID currentUserId) {
-        return 0;
+        log.info("Get Count of issues assigned to current user: {}", currentUserId);
+
+        // 1. Validate user exists (optional but recommended)
+        if (!userRepository.existsById(currentUserId)) {
+            throw new IllegalArgumentException("User not found with ID: " + currentUserId);
+        }
+
+        long count = issueRepository.countByAssignee(currentUserId);
+
+        log.debug("User {} has {} assigned issues", currentUserId, count);
+        return count;
     }
 
     private boolean canEditIssue(Issue issue, UUID userId, UUID projectId) {
