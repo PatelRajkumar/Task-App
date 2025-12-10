@@ -130,19 +130,6 @@ CREATE TABLE public.issue_history (
 ALTER TABLE public.issue_history OWNER TO taskapp;
 
 --
--- Name: issue_labels; Type: TABLE; Schema: public; Owner: taskapp
---
-
-CREATE TABLE public.issue_labels (
-    issue_id uuid NOT NULL,
-    label_id uuid NOT NULL,
-    added_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
-);
-
-
-ALTER TABLE public.issue_labels OWNER TO taskapp;
-
---
 -- Name: issues; Type: TABLE; Schema: public; Owner: taskapp
 --
 
@@ -173,18 +160,6 @@ CREATE TABLE public.issues (
 
 ALTER TABLE public.issues OWNER TO taskapp;
 
---
--- Name: labels; Type: TABLE; Schema: public; Owner: taskapp
---
-
-CREATE TABLE public.labels (
-    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
-    name character varying(50) NOT NULL,
-    color character varying(7) NOT NULL
-);
-
-
-ALTER TABLE public.labels OWNER TO taskapp;
 
 --
 -- Name: permissions; Type: TABLE; Schema: public; Owner: taskapp
@@ -410,14 +385,6 @@ COPY public.issue_history (id, issue_id, changed_by, field, old_value, new_value
 
 
 --
--- Data for Name: issue_labels; Type: TABLE DATA; Schema: public; Owner: taskapp
---
-
-COPY public.issue_labels (issue_id, label_id, added_at) FROM stdin;
-\.
-
-
---
 -- Data for Name: issues; Type: TABLE DATA; Schema: public; Owner: taskapp
 --
 
@@ -425,17 +392,7 @@ COPY public.issues (id, project_id, key, due_date, sequential_number, title, des
 \.
 
 
---
--- Data for Name: labels; Type: TABLE DATA; Schema: public; Owner: taskapp
---
 
-COPY public.labels (id, name, color) FROM stdin;
-9752d946-7912-40c3-b702-ae7b448f8e4d	bug	#d73a4a
-1bcbc404-8b1c-4fae-b074-72a74618ac23	enhancement	#a2eeef
-c74fe48b-dfaa-4b5e-b375-47f008c0efe8	documentation	#0075ca
-7d0813cf-3f00-4b80-9e59-4aaa4a51bd41	urgent	#b60205
-f5f730e5-4dfc-4b1a-9078-e3926cb89a2b	help wanted	#008672
-\.
 
 
 --
@@ -618,13 +575,6 @@ ALTER TABLE ONLY public.issue_history
     ADD CONSTRAINT issue_history_pkey PRIMARY KEY (id);
 
 
---
--- Name: issue_labels issue_labels_pkey; Type: CONSTRAINT; Schema: public; Owner: taskapp
---
-
-ALTER TABLE ONLY public.issue_labels
-    ADD CONSTRAINT issue_labels_pkey PRIMARY KEY (issue_id, label_id);
-
 
 --
 -- Name: issues issues_key_key; Type: CONSTRAINT; Schema: public; Owner: taskapp
@@ -649,21 +599,6 @@ ALTER TABLE ONLY public.issues
 ALTER TABLE ONLY public.issues
     ADD CONSTRAINT issues_project_id_sequential_number_key UNIQUE (project_id, sequential_number);
 
-
---
--- Name: labels labels_name_key; Type: CONSTRAINT; Schema: public; Owner: taskapp
---
-
-ALTER TABLE ONLY public.labels
-    ADD CONSTRAINT labels_name_key UNIQUE (name);
-
-
---
--- Name: labels labels_pkey; Type: CONSTRAINT; Schema: public; Owner: taskapp
---
-
-ALTER TABLE ONLY public.labels
-    ADD CONSTRAINT labels_pkey PRIMARY KEY (id);
 
 
 --
@@ -910,19 +845,6 @@ CREATE INDEX idx_issue_history_changed_at ON public.issue_history USING btree (c
 CREATE INDEX idx_issue_history_issue_id ON public.issue_history USING btree (issue_id);
 
 
---
--- Name: idx_issue_labels_issue_id; Type: INDEX; Schema: public; Owner: taskapp
---
-
-CREATE INDEX idx_issue_labels_issue_id ON public.issue_labels USING btree (issue_id);
-
-
---
--- Name: idx_issue_labels_label_id; Type: INDEX; Schema: public; Owner: taskapp
---
-
-CREATE INDEX idx_issue_labels_label_id ON public.issue_labels USING btree (label_id);
-
 
 --
 -- Name: idx_issues_assignee_id; Type: INDEX; Schema: public; Owner: taskapp
@@ -987,11 +909,6 @@ CREATE INDEX idx_issues_status ON public.issues USING btree (status);
 CREATE INDEX idx_issues_type ON public.issues USING btree (type);
 
 
---
--- Name: idx_labels_name; Type: INDEX; Schema: public; Owner: taskapp
---
-
-CREATE INDEX idx_labels_name ON public.labels USING btree (name);
 
 
 --
@@ -1170,21 +1087,6 @@ ALTER TABLE ONLY public.issue_history
 ALTER TABLE ONLY public.issue_history
     ADD CONSTRAINT issue_history_issue_id_fkey FOREIGN KEY (issue_id) REFERENCES public.issues(id) ON DELETE CASCADE;
 
-
---
--- Name: issue_labels issue_labels_issue_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: taskapp
---
-
-ALTER TABLE ONLY public.issue_labels
-    ADD CONSTRAINT issue_labels_issue_id_fkey FOREIGN KEY (issue_id) REFERENCES public.issues(id) ON DELETE CASCADE;
-
-
---
--- Name: issue_labels issue_labels_label_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: taskapp
---
-
-ALTER TABLE ONLY public.issue_labels
-    ADD CONSTRAINT issue_labels_label_id_fkey FOREIGN KEY (label_id) REFERENCES public.labels(id) ON DELETE CASCADE;
 
 
 --

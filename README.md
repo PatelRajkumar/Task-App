@@ -113,6 +113,8 @@ ALTER TABLE users ADD COLUMN preferences JSONB;
 - **V7**: Activity Feed
 - **V8**: Projects Schema Updates
 - **V9**: Remove Workflows (Simplified to status enum)
+- **V10**: Update Enum Constraints (uppercase STATUS, TYPE, PRIORITY)
+- **V11**: Remove Labels (Simplified - redundant with type/priority)
 
 ---
 
@@ -138,7 +140,6 @@ com.pm.taskapp/
 │   └── enums/
 ├── issue/             # Issues/Tasks (TODO)
 ├── comment/           # Comments (TODO)
-├── label/             # Labels (TODO)
 └── common/            # Shared utilities
     ├── exception/
     └── config/
@@ -231,6 +232,13 @@ mvn spring-boot:run
 ```
 
 ---
+
+## ⚠️ Removed Features
+
+### Labels Module (Removed in V11)
+- **Reason**: Redundant with existing `type` (TASK/BUG) and `priority` (LOW/MEDIUM/HIGH)
+- **Alternative**: Use issue type and priority for categorization
+- **Date Removed**: December 2024
 
 ## 📧 Contact
 
