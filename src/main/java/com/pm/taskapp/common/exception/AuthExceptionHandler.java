@@ -34,7 +34,7 @@ import com.pm.taskapp.common.exception.ErrorResponse;
  * Exception handler for authentication and authorization related exceptions.
  * Handles all exceptions from the auth module (com.pm.taskapp.auth).
  */
-@RestControllerAdvice(basePackages = "com.pm.taskapp.auth")
+@RestControllerAdvice
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public class AuthExceptionHandler {
 
