@@ -12,6 +12,8 @@ import com.pm.taskapp.task.entity.Issue;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.Id;
@@ -70,6 +72,7 @@ public class Attachment {
     private String storagePath;
 
     @Column(name = "storage_type", nullable = false)
+    @Enumerated(EnumType.STRING)
     private StorageType storageType;
 
     @Column(name = "is_deleted", nullable = false)

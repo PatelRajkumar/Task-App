@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.servlet.NoHandlerFoundException;
 
 import com.fasterxml.jackson.core.JsonParseException;
@@ -287,6 +288,19 @@ public class GlobalExceptionHandler {
                 .build();
 
         return new ResponseEntity<>(errorResponse, HttpStatus.BAD_REQUEST);
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ErrorResponse> handleMaxSizeException(MaxUploadSizeExceededException ex, WebRequest request) {
+        return ResponseEntity.status(413).body(
+                ErrorResponse.builder()
+                        .timestamp(Instant.now())
+                        .status(HttpStatus.REQUEST_ENTITY_TOO_LARGE.value())
+                        .error("Request Entity Too Large")
+                        .message(ex.getMessage())
+                        .errorCode("FILE_TOO_LARGE")
+                        .path(getRequestPath(request))
+                        .build());
     }
 
     /**
