@@ -115,6 +115,9 @@ ALTER TABLE users ADD COLUMN preferences JSONB;
 - **V9**: Remove Workflows (Simplified to status enum)
 - **V10**: Update Enum Constraints (uppercase STATUS, TYPE, PRIORITY)
 - **V11**: Remove Labels (Simplified - redundant with type/priority)
+- **V12**: Add Deleted at to comments table
+- **V13**: Fix attachments storage type enum
+- **V14**: Remove Activity Feed (Redundant with Issue History)
 
 ---
 
@@ -239,6 +242,13 @@ mvn spring-boot:run
 - **Reason**: Redundant with existing `type` (TASK/BUG) and `priority` (LOW/MEDIUM/HIGH)
 - **Alternative**: Use issue type and priority for categorization
 - **Date Removed**: December 2024
+
+### Audit Trail Strategy
+This application uses **Issue History** for comprehensive audit tracking:
+- **Issue History**: Tracks all field-level changes (status, assignee, priority, title, description)
+- **Location**: `issue_history` table
+- **Coverage**: Complete change tracking with old/new values, timestamps, and actor
+- **Decision**: Activity Feed removed (V12) as redundant with Issue History
 
 ## 📧 Contact
 
