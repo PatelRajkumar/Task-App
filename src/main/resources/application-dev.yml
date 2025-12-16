@@ -1,8 +1,8 @@
 spring:
   datasource:
-    url: jdbc:postgresql://localhost:5432/taskapp
-    username: taskapp
-    password: taskapp123
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
 
   jpa:
@@ -23,3 +23,40 @@ spring:
     sql-migration-suffixes: .sql
     validate-on-migrate: true
     out-of-order: false
+
+  security:
+    require-ssl: false
+
+
+# ========== AWS S3 Configuration ==========
+aws:
+  s3:
+    # Use your AWS region (check your bucket region)
+    region: ${AWS_REGION}
+    bucket-name: ${AWS_BUCKET_NAME}
+    # Access key from IAM user (use env variable in production)
+    access-key: ${AWS_ACCESS_KEY}
+    secret-key: ${AWS_SECRET_KEY}
+    # S3 endpoint (use for localstack testing, optional)
+    endpoint-override: ${AWS_ENDPOINT_OVERRIDE:} # Leave empty for AWS, set for localstack
+    path-style-access: true
+    # Cache file URLs for 1 hour (presigned URL expiration)
+    presigned-url-expiration-hours: 1
+
+# ========== File Upload Configuration ==========
+app:
+  file-upload:
+    # Local fallback storage (dev/testing)
+    local-storage-path: ./uploads
+    # Maximum file size: 50 MB (in bytes)
+    max-file-size: 52428800
+    # Allowed MIME types (comma-separated)
+    allowed-mime-types: image/jpeg,image/png,image/gif,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/plain,text/csv
+    # Storage type: local or s3
+    storage-type: s3
+    # Scan files for viruses (optional, requires ClamAV)
+    virus-scanning-enabled: false
+    # Path prefix in S3 bucket
+    s3-path-prefix: attachments/
+    # Auto-delete files after days (0 = disabled)
+    auto-delete-after-days: 90
