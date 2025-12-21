@@ -90,9 +90,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
             Authentication authentication = authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(
                             loginRequest.getEmail(),
-                            loginRequest.getPassword()
-                    )
-            );
+                            loginRequest.getPassword()));
 
             SecurityContextHolder.getContext().setAuthentication(authentication);
             UserPrincipal userPrincipal = (UserPrincipal) authentication.getPrincipal();
@@ -117,7 +115,7 @@ public class AuthenticationServiceImpl implements AuthenticationService {
                     .refreshToken(refreshToken.getToken())
                     .tokenType("Bearer")
                     .expiresIn(jwtTokenService.getAccessTokenExpirationMs())
-                    .user(userMapper.toResponseDTO(user))
+                    .user(userMapper.toResponseDTOWithPermissions(user))
                     .build();
 
         } catch (BadCredentialsException e) {
@@ -329,7 +327,8 @@ public class AuthenticationServiceImpl implements AuthenticationService {
 
     private boolean isPasswordStrong(String password) {
         // Implement password strength validation
-        // Minimum 8 characters, at least one uppercase, one lowercase, one number, one special character
+        // Minimum 8 characters, at least one uppercase, one lowercase, one number, one
+        // special character
         String passwordRegex = "^(?=.*[0-9])(?=.*[a-z])(?=.*[A-Z])(?=.*[@#$%^&+=])(?=\\S+$).{8,}$";
         return password.matches(passwordRegex);
     }
@@ -351,10 +350,24 @@ public class AuthenticationServiceImpl implements AuthenticationService {
         }
 
         // Getters and setters
-        public int getAttemptCount() { return attemptCount; }
-        public Instant getLastAttemptTime() { return lastAttemptTime; }
-        public void setLastAttemptTime(Instant time) { this.lastAttemptTime = time; }
-        public boolean isLocked() { return locked; }
-        public void setLocked(boolean locked) { this.locked = locked; }
+        public int getAttemptCount() {
+            return attemptCount;
+        }
+
+        public Instant getLastAttemptTime() {
+            return lastAttemptTime;
+        }
+
+        public void setLastAttemptTime(Instant time) {
+            this.lastAttemptTime = time;
+        }
+
+        public boolean isLocked() {
+            return locked;
+        }
+
+        public void setLocked(boolean locked) {
+            this.locked = locked;
+        }
     }
 }

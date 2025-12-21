@@ -89,7 +89,7 @@ public class UserServiceImpl implements UserService {
     @Transactional(readOnly = true)
     public UserResponseDTO findById(UUID id) {
         User user = findUserById(id);
-        return userMapper.toResponseDTO(user);
+        return userMapper.toResponseDTOWithPermissions(user);
     }
 
     @Override
