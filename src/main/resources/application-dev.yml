@@ -38,7 +38,8 @@ aws:
     access-key: ${AWS_ACCESS_KEY}
     secret-key: ${AWS_SECRET_KEY}
     # S3 endpoint (use for localstack testing, optional)
-    endpoint-override: ${AWS_ENDPOINT_OVERRIDE:} # Leave empty for AWS, set for localstack
+    # endpoint-override: ${AWS_ENDPOINT_OVERRIDE:} # Leave empty for AWS, set for localstack
+    endpoint-override: "" # Leave empty for AWS, set for localstack
     path-style-access: true
     # Cache file URLs for 1 hour (presigned URL expiration)
     presigned-url-expiration-hours: 1
