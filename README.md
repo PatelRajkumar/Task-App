@@ -154,12 +154,80 @@ com.pm.taskapp/
 
 - **Framework**: Spring Boot 3.x
 - **Database**: PostgreSQL 15+
+- **Cache**: Redis 7.x
 - **Security**: Spring Security + JWT
 - **ORM**: Spring Data JPA / Hibernate
 - **Migration**: Flyway
 - **Validation**: Hibernate Validator
 - **Documentation**: SpringDoc OpenAPI (Swagger)
 - **Build Tool**: Maven
+
+---
+
+## 💾 Caching Strategy
+
+The application uses **Redis** for caching to improve performance and reduce database load.
+
+### Cache Configuration
+
+**Location**: `com.pm.taskapp.config.cache.RedisConfig`
+
+- **Serialization**: JSON with Spring Security support
+- **Default TTL**: 5 minutes
+- **Transaction-aware**: Cache operations synchronized with database transactions
+
+### Cached Data
+
+| Cache Name | Data | TTL | Eviction Triggers |
+|------------|------|-----|-------------------|
+| `user:details` | UserPrincipal (with authorities) | 15 min | User update, password change, role assignment, logout |
+
+### Cache Eviction
+
+Cache is automatically evicted when:
+- User profile is updated
+- User password is changed
+- User roles or permissions are modified
+- User account is enabled/disabled
+- User is deleted
+- User logs out
+
+### Redis Setup
+
+**Via Docker Compose** (Recommended):
+```bash
+cd docker/postgres
+docker-compose up -d redis
+```
+
+**Configuration** (`application-dev.yml`):
+```yaml
+spring:
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      password: ${REDIS_PASSWORD}
+```
+
+### Monitoring Cache
+
+**View cached keys**:
+```bash
+docker exec -it taskapp_redis redis-cli
+KEYS *
+```
+
+**Clear all cache** (development only):
+```bash
+docker exec taskapp_redis redis-cli FLUSHALL
+```
+
+### Performance Impact
+
+- **First request**: Loads from database → Caches in Redis
+- **Subsequent requests**: Loads from Redis (15-20x faster)
+- **After eviction**: Reloads from database → Re-caches
 
 ---
 
