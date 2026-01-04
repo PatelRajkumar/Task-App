@@ -26,7 +26,7 @@ public class UserPrincipal implements UserDetails {
     private Collection<? extends GrantedAuthority> authorities;
 
     public UserPrincipal(UUID id, String name, String email, String password,
-                         boolean enabled, Collection<? extends GrantedAuthority> authorities) {
+            boolean enabled, Collection<? extends GrantedAuthority> authorities) {
         this.id = id;
         this.name = name;
         this.email = email;
@@ -62,8 +62,7 @@ public class UserPrincipal implements UserDetails {
                 user.getEmail(),
                 user.getPasswordHash(),
                 user.isEnabled(),
-                authorities
-        );
+                authorities);
     }
 
     public UUID getId() {
@@ -89,21 +88,25 @@ public class UserPrincipal implements UserDetails {
     }
 
     @Override
+    @JsonIgnore
     public String getUsername() {
         return email; // Using email as username
     }
 
     @Override
+    @JsonIgnore
     public boolean isAccountNonExpired() {
         return true;
     }
 
     @Override
+    @JsonIgnore
     public boolean isAccountNonLocked() {
         return true;
     }
 
     @Override
+    @JsonIgnore
     public boolean isCredentialsNonExpired() {
         return true;
     }
@@ -132,6 +135,7 @@ public class UserPrincipal implements UserDetails {
     /**
      * Get all roles.
      */
+    @JsonIgnore
     public Set<String> getRoles() {
         return authorities.stream()
                 .map(GrantedAuthority::getAuthority)
@@ -142,6 +146,7 @@ public class UserPrincipal implements UserDetails {
     /**
      * Get all permissions.
      */
+    @JsonIgnore
     public Set<String> getPermissions() {
         return authorities.stream()
                 .map(GrantedAuthority::getAuthority)
@@ -151,8 +156,10 @@ public class UserPrincipal implements UserDetails {
 
     @Override
     public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
+        if (this == o)
+            return true;
+        if (o == null || getClass() != o.getClass())
+            return false;
         UserPrincipal that = (UserPrincipal) o;
         return Objects.equals(id, that.id);
     }

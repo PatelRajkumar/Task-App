@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.jsontype.impl.LaissezFaireSubTypeValidator;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.jackson2.SecurityJackson2Modules;
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -51,108 +52,112 @@ import java.util.Map;
 @EnableCaching
 public class RedisConfig {
 
-    /**
-     * Configure RedisTemplate with JSON serialization.
-     * Used for manual Redis operations if needed (not used for @Cacheable
-     * annotations).
-     * 
-     * @param connectionFactory Redis connection factory (auto-configured by Spring
-     *                          Boot)
-     * @param objectMapper      Jackson ObjectMapper for JSON serialization
-     * @return Configured RedisTemplate
-     */
-    @Bean
-    public RedisTemplate<String, Object> redisTemplate(
-            RedisConnectionFactory connectionFactory,
-            ObjectMapper objectMapper) {
+        /**
+         * Configure RedisTemplate with JSON serialization.
+         * Used for manual Redis operations if needed (not used for @Cacheable
+         * annotations).
+         * 
+         * @param connectionFactory Redis connection factory (auto-configured by Spring
+         *                          Boot)
+         * @param objectMapper      Jackson ObjectMapper for JSON serialization
+         * @return Configured RedisTemplate
+         */
+        @Bean
+        public RedisTemplate<String, Object> redisTemplate(
+                        RedisConnectionFactory connectionFactory,
+                        ObjectMapper objectMapper) {
 
-        log.info("Configuring RedisTemplate with JSON serialization");
+                log.info("Configuring RedisTemplate with JSON serialization");
 
-        RedisTemplate<String, Object> template = new RedisTemplate<>();
-        template.setConnectionFactory(connectionFactory);
+                RedisTemplate<String, Object> template = new RedisTemplate<>();
+                template.setConnectionFactory(connectionFactory);
 
-        // String serializer for keys (e.g., "taskapp::user:details:123")
-        StringRedisSerializer stringSerializer = new StringRedisSerializer();
-        template.setKeySerializer(stringSerializer);
-        template.setHashKeySerializer(stringSerializer);
+                // String serializer for keys (e.g., "taskapp::user:details:123")
+                StringRedisSerializer stringSerializer = new StringRedisSerializer();
+                template.setKeySerializer(stringSerializer);
+                template.setHashKeySerializer(stringSerializer);
 
-        // JSON serializer for values (with type information for polymorphic objects)
-        GenericJackson2JsonRedisSerializer jsonSerializer = createJsonSerializer(objectMapper);
-        template.setValueSerializer(jsonSerializer);
-        template.setHashValueSerializer(jsonSerializer);
+                // JSON serializer for values (with type information for polymorphic objects)
+                GenericJackson2JsonRedisSerializer jsonSerializer = createJsonSerializer(objectMapper);
+                template.setValueSerializer(jsonSerializer);
+                template.setHashValueSerializer(jsonSerializer);
 
-        template.afterPropertiesSet();
+                template.afterPropertiesSet();
 
-        log.debug("RedisTemplate configured successfully");
-        return template;
-    }
+                log.debug("RedisTemplate configured successfully");
+                return template;
+        }
 
-    /**
-     * Configure RedisCacheManager with custom TTLs per cache name.
-     * This is the primary configuration for Spring Cache abstraction.
-     * 
-     * @param connectionFactory Redis connection factory
-     * @param objectMapper      Jackson ObjectMapper for JSON serialization
-     * @return Configured RedisCacheManager
-     */
-    @Bean
-    public RedisCacheManager cacheManager(
-            RedisConnectionFactory connectionFactory,
-            ObjectMapper objectMapper) {
+        /**
+         * Configure RedisCacheManager with custom TTLs per cache name.
+         * This is the primary configuration for Spring Cache abstraction.
+         * 
+         * @param connectionFactory Redis connection factory
+         * @param objectMapper      Jackson ObjectMapper for JSON serialization
+         * @return Configured RedisCacheManager
+         */
+        @Bean
+        public RedisCacheManager cacheManager(
+                        RedisConnectionFactory connectionFactory,
+                        ObjectMapper objectMapper) {
 
-        log.info("Configuring RedisCacheManager with custom TTLs");
+                log.info("Configuring RedisCacheManager with custom TTLs");
 
-        // Default cache configuration (5 minutes fallback)
-        RedisCacheConfiguration defaultConfig = RedisCacheConfiguration.defaultCacheConfig()
-                .entryTtl(Duration.ofMinutes(5))
-                .disableCachingNullValues() // Never cache null values
-                .serializeKeysWith(RedisSerializationContext.SerializationPair.fromSerializer(
-                        new StringRedisSerializer()))
-                .serializeValuesWith(RedisSerializationContext.SerializationPair.fromSerializer(
-                        createJsonSerializer(objectMapper)));
+                // Default cache configuration (5 minutes fallback)
+                RedisCacheConfiguration defaultConfig = RedisCacheConfiguration.defaultCacheConfig()
+                                .entryTtl(Duration.ofMinutes(5))
+                                .disableCachingNullValues() // Never cache null values
+                                .serializeKeysWith(RedisSerializationContext.SerializationPair.fromSerializer(
+                                                new StringRedisSerializer()))
+                                .serializeValuesWith(RedisSerializationContext.SerializationPair.fromSerializer(
+                                                createJsonSerializer(objectMapper)));
 
-        // Custom TTLs per cache name
-        Map<String, RedisCacheConfiguration> cacheConfigurations = new HashMap<>();
+                // Custom TTLs per cache name
+                Map<String, RedisCacheConfiguration> cacheConfigurations = new HashMap<>();
 
-        // User details cache: 15 minutes (1/4 of JWT expiration: 3600000ms)
-        cacheConfigurations.put(
-                CacheNames.USER_DETAILS,
-                defaultConfig.entryTtl(Duration.ofMinutes(15)));
+                // User details cache: 15 minutes (1/4 of JWT expiration: 3600000ms)
+                cacheConfigurations.put(
+                                CacheNames.USER_DETAILS,
+                                defaultConfig.entryTtl(Duration.ofMinutes(15)));
 
-        // Project member cache: 5 minutes (faster propagation for authorization
-        // changes)
-        cacheConfigurations.put(
-                CacheNames.PROJECT_MEMBER,
-                defaultConfig.entryTtl(Duration.ofMinutes(5)));
+                // Project member cache: 5 minutes (faster propagation for authorization
+                // changes)
+                cacheConfigurations.put(
+                                CacheNames.PROJECT_MEMBER,
+                                defaultConfig.entryTtl(Duration.ofMinutes(5)));
 
-        log.info("Cache TTL configuration: {} = 15 min, {} = 5 min",
-                CacheNames.USER_DETAILS, CacheNames.PROJECT_MEMBER);
+                log.info("Cache TTL configuration: {} = 15 min, {} = 5 min",
+                                CacheNames.USER_DETAILS, CacheNames.PROJECT_MEMBER);
 
-        return RedisCacheManager.builder(connectionFactory)
-                .cacheDefaults(defaultConfig)
-                .withInitialCacheConfigurations(cacheConfigurations)
-                .transactionAware() // Synchronize cache operations with DB transactions
-                .build();
-    }
+                return RedisCacheManager.builder(connectionFactory)
+                                .cacheDefaults(defaultConfig)
+                                .withInitialCacheConfigurations(cacheConfigurations)
+                                .transactionAware() // Synchronize cache operations with DB transactions
+                                .build();
+        }
 
-    /**
-     * Create JSON serializer with type information for polymorphic objects.
-     * This allows proper deserialization of complex objects like UserPrincipal.
-     * 
-     * @param objectMapper Source ObjectMapper to copy configuration from
-     * @return Configured JSON serializer
-     */
-    private GenericJackson2JsonRedisSerializer createJsonSerializer(ObjectMapper objectMapper) {
-        // Create a copy of the application's ObjectMapper to avoid side effects
-        ObjectMapper cachingObjectMapper = objectMapper.copy();
+        /**
+         * Create JSON serializer with type information for polymorphic objects.
+         * This allows proper deserialization of complex objects like UserPrincipal.
+         * 
+         * @param objectMapper Source ObjectMapper to copy configuration from
+         * @return Configured JSON serializer
+         */
+        private GenericJackson2JsonRedisSerializer createJsonSerializer(ObjectMapper objectMapper) {
+                // Create a copy of the application's ObjectMapper to avoid side effects
+                ObjectMapper cachingObjectMapper = objectMapper.copy();
 
-        // Enable type information for polymorphic deserialization
-        // This adds "@class" field to JSON, allowing reconstruction of exact types
-        cachingObjectMapper.activateDefaultTyping(
-                LaissezFaireSubTypeValidator.instance,
-                ObjectMapper.DefaultTyping.NON_FINAL,
-                JsonTypeInfo.As.PROPERTY);
+                // Register Spring Security Jackson modules to handle Security classes
+                // This fixes deserialization of SimpleGrantedAuthority and other Security types
+                cachingObjectMapper.registerModules(SecurityJackson2Modules.getModules(getClass().getClassLoader()));
 
-        return new GenericJackson2JsonRedisSerializer(cachingObjectMapper);
-    }
+                // Enable type information for polymorphic deserialization
+                // This adds "@class" field to JSON, allowing reconstruction of exact types
+                cachingObjectMapper.activateDefaultTyping(
+                                LaissezFaireSubTypeValidator.instance,
+                                ObjectMapper.DefaultTyping.NON_FINAL,
+                                JsonTypeInfo.As.PROPERTY);
+
+                return new GenericJackson2JsonRedisSerializer(cachingObjectMapper);
+        }
 }

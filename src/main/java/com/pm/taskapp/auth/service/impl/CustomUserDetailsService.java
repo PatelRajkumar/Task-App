@@ -4,8 +4,11 @@ import com.pm.taskapp.auth.enitity.User;
 import com.pm.taskapp.auth.exception.ResourceNotFoundException;
 import com.pm.taskapp.auth.repository.UserRepository;
 import com.pm.taskapp.auth.security.UserPrincipal;
+import com.pm.taskapp.config.cache.CacheNames;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -60,6 +63,7 @@ public class CustomUserDetailsService implements UserDetailsService {
      * @param id User ID
      * @return UserDetails for Spring Security
      */
+    @Cacheable(cacheNames = CacheNames.USER_DETAILS, key = "#id")
     @Transactional(readOnly = true)
     public UserDetails loadUserById(UUID id) {
         log.debug("Loading user by id: {}", id);
@@ -69,8 +73,8 @@ public class CustomUserDetailsService implements UserDetailsService {
                         .orElseThrow(() -> {
                             log.error("User not found with id: {}", id);
                             return new ResourceNotFoundException("User not found with id: " + id);
-                        }).getEmail()
-        ).orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + id));
+                        }).getEmail())
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + id));
 
         return UserPrincipal.create(user);
     }

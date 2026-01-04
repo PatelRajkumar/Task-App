@@ -13,8 +13,12 @@ import com.pm.taskapp.auth.mapper.UserMapper;
 import com.pm.taskapp.auth.repository.RoleRepository;
 import com.pm.taskapp.auth.repository.UserRepository;
 import com.pm.taskapp.auth.service.UserService;
+import com.pm.taskapp.config.cache.CacheNames;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -113,9 +117,10 @@ public class UserServiceImpl implements UserService {
                 .orElseThrow(() -> new ResourceNotFoundException(EMAIL_NOT_FOUND + email));
     }
 
+    @CacheEvict(cacheNames = CacheNames.USER_DETAILS, key = "#id")
     @Override
     public UserResponseDTO updateUser(UUID id, UserUpdateDTO updateDTO) {
-        log.info("Updating user with id: {}", id);
+        log.info("Updating user with id: {},evicting cache", id);
 
         User user = findUserById(id);
 
@@ -141,8 +146,9 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    @CacheEvict(cacheNames = CacheNames.USER_DETAILS, key = "#userId")
     public void changePassword(UUID userId, PasswordChangeDTO passwordChangeDTO) {
-        log.info("Changing password for user: {}", userId);
+        log.info("Changing password for user: {},evicting cache", userId);
 
         User user = findUserById(userId);
 
@@ -164,8 +170,9 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    @CacheEvict(cacheNames = CacheNames.USER_DETAILS, key = "#userId")
     public void resetPassword(UUID userId, String newPassword) {
-        log.info("Resetting password for user: {}", userId);
+        log.info("Resetting password for user: {},evicting cache", userId);
 
         User user = findUserById(userId);
         user.setPasswordHash(passwordEncoder.encode(newPassword));
@@ -174,9 +181,10 @@ public class UserServiceImpl implements UserService {
         log.info("Password reset successfully for user: {}", userId);
     }
 
+    @CacheEvict(cacheNames = CacheNames.USER_DETAILS, key = "#userId")
     @Override
     public void setUserEnabled(UUID userId, boolean enabled) {
-        log.info("Setting user enabled status to {} for user: {}", enabled, userId);
+        log.info("Setting user enabled status to {} for user: {},evicting cache ", enabled, userId);
 
         User user = findUserById(userId);
         user.setEnabled(enabled);
@@ -186,15 +194,16 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    @CacheEvict(cacheNames = CacheNames.USER_DETAILS, key = "#id")
     public void deleteUser(UUID id) {
-        log.info("Deleting user with id: {}", id);
+        log.info("Deleting user with id: {},evicting cache", id);
 
         if (!userRepository.existsById(id)) {
             throw new ResourceNotFoundException(USER_NOT_FOUND + id);
         }
 
         userRepository.deleteById(id);
-        log.info("User deleted successfully with id: {}", id);
+        log.info("User deleted successfully with id: {},evicting cache", id);
     }
 
     @Override
@@ -219,9 +228,10 @@ public class UserServiceImpl implements UserService {
                 .map(userMapper::toResponseDTO);
     }
 
+    @CacheEvict(cacheNames = CacheNames.USER_DETAILS, key = "#userId")
     @Override
     public UserResponseDTO assignRoles(UUID userId, Set<String> roleNames) {
-        log.info("Assigning roles {} to user: {}", roleNames, userId);
+        log.info("Assigning roles {} to user: {},evicting cache", roleNames, userId);
 
         User user = findUserById(userId);
         Set<Role> newRoles = new HashSet<>();
@@ -239,9 +249,10 @@ public class UserServiceImpl implements UserService {
         return userMapper.toResponseDTO(updatedUser);
     }
 
+    @CacheEvict(cacheNames = CacheNames.USER_DETAILS, key = "#userId")
     @Override
     public UserResponseDTO removeRole(UUID userId, String roleName) {
-        log.info("Removing role {} from user: {}", roleName, userId);
+        log.info("Removing role {} from user: {},evicting cache", roleName, userId);
 
         User user = findUserById(userId);
         Role roleToRemove = roleRepository.findByName(roleName)
@@ -274,7 +285,8 @@ public class UserServiceImpl implements UserService {
         log.debug("Searching users with term: {}", searchTerm);
 
         // Note: You'll need to add this method to UserRepository
-        // Page<User> findByEmailContainingIgnoreCaseOrNameContainingIgnoreCase(String email, String name, Pageable pageable);
+        // Page<User> findByEmailContainingIgnoreCaseOrNameContainingIgnoreCase(String
+        // email, String name, Pageable pageable);
 
         // For now, returning all users as placeholder
         return userRepository.findAll(pageable)
@@ -291,7 +303,7 @@ public class UserServiceImpl implements UserService {
     @Transactional(readOnly = true)
     public User getUserWithRolesAndPermissions(UUID userId) {
         return userRepository.findWithRolesAndPermissionsByEmailIgnoreCase(
-                findUserById(userId).getEmail()
-        ).orElseThrow(() -> new ResourceNotFoundException(USER_NOT_FOUND + userId));
+                findUserById(userId).getEmail())
+                .orElseThrow(() -> new ResourceNotFoundException(USER_NOT_FOUND + userId));
     }
 }

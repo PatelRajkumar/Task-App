@@ -7,10 +7,12 @@ import com.pm.taskapp.auth.exception.*;
 import com.pm.taskapp.auth.mapper.UserMapper;
 import com.pm.taskapp.auth.security.UserPrincipal;
 import com.pm.taskapp.auth.service.*;
+import com.pm.taskapp.config.cache.CacheNames;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.DisabledException;
@@ -156,8 +158,9 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     }
 
     @Override
+    @CacheEvict(cacheNames = CacheNames.USER_DETAILS, key = "#userId")
     public void logout(UUID userId) {
-        log.info("Logging out user: {}", userId);
+        log.info("Logging out user: {},evicting cache", userId);
 
         // Invalidate refresh tokens
         refreshTokenService.deleteByUserId(userId);
@@ -169,8 +172,9 @@ public class AuthenticationServiceImpl implements AuthenticationService {
     }
 
     @Override
+    @CacheEvict(cacheNames = CacheNames.USER_DETAILS, key = "#userId")
     public void logoutAllDevices(UUID userId) {
-        log.info("Logging out user from all devices: {}", userId);
+        log.info("Logging out user from all devices: {},evicting cache", userId);
 
         // Delete all refresh tokens for user
         refreshTokenService.deleteAllUserTokens(userId);

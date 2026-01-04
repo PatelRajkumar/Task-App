@@ -28,6 +28,7 @@ import org.springframework.web.bind.annotation.*;
 public class AuthController {
 
     private final AuthenticationService authenticationService;
+    private final com.pm.taskapp.auth.service.JwtTokenService jwtTokenService;
 
     /**
      * Register a new user account.
@@ -35,10 +36,9 @@ public class AuthController {
     @PostMapping("/register")
     @Operation(summary = "Register new user", description = "Create a new user account")
     @ApiResponses(value = {
-        @ApiResponse(responseCode = "201", description = "User registered successfully",
-                content = @Content(schema = @Schema(implementation = UserResponseDTO.class))),
-        @ApiResponse(responseCode = "400", description = "Invalid input data"),
-        @ApiResponse(responseCode = "409", description = "Email already exists")
+            @ApiResponse(responseCode = "201", description = "User registered successfully", content = @Content(schema = @Schema(implementation = UserResponseDTO.class))),
+            @ApiResponse(responseCode = "400", description = "Invalid input data"),
+            @ApiResponse(responseCode = "409", description = "Email already exists")
     })
     public ResponseEntity<UserResponseDTO> register(@Valid @RequestBody RegisterRequestDTO registerRequest) {
         log.info("Registration request received for email: {}", registerRequest.getEmail());
@@ -52,19 +52,18 @@ public class AuthController {
     @PostMapping("/login")
     @Operation(summary = "User login", description = "Authenticate user and receive tokens")
     @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "Login successful",
-                content = @Content(schema = @Schema(implementation = LoginResponseDTO.class))),
-        @ApiResponse(responseCode = "401", description = "Invalid credentials"),
-        @ApiResponse(responseCode = "403", description = "Account locked or disabled")
+            @ApiResponse(responseCode = "200", description = "Login successful", content = @Content(schema = @Schema(implementation = LoginResponseDTO.class))),
+            @ApiResponse(responseCode = "401", description = "Invalid credentials"),
+            @ApiResponse(responseCode = "403", description = "Account locked or disabled")
     })
     public ResponseEntity<LoginResponseDTO> login(
             @Valid @RequestBody LoginRequestDTO loginRequest,
             HttpServletRequest request) {
-        
+
         // Add request metadata for security tracking
         loginRequest.setIpAddress(getClientIpAddress(request));
         loginRequest.setUserAgent(request.getHeader("User-Agent"));
-        
+
         log.info("Login request received for email: {}", loginRequest.getEmail());
         LoginResponseDTO response = authenticationService.login(loginRequest);
         return ResponseEntity.ok(response);
@@ -76,17 +75,16 @@ public class AuthController {
     @PostMapping("/refresh")
     @Operation(summary = "Refresh token", description = "Get new access token using refresh token")
     @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "Token refreshed successfully",
-                content = @Content(schema = @Schema(implementation = LoginResponseDTO.class))),
-        @ApiResponse(responseCode = "401", description = "Invalid or expired refresh token")
+            @ApiResponse(responseCode = "200", description = "Token refreshed successfully", content = @Content(schema = @Schema(implementation = LoginResponseDTO.class))),
+            @ApiResponse(responseCode = "401", description = "Invalid or expired refresh token")
     })
     public ResponseEntity<LoginResponseDTO> refreshToken(
             @Valid @RequestBody RefreshTokenRequestDTO refreshTokenRequest,
             HttpServletRequest request) {
-        
+
         // Add request metadata
         refreshTokenRequest.setIpAddress(getClientIpAddress(request));
-        
+
         log.info("Token refresh request received");
         LoginResponseDTO response = authenticationService.refreshToken(refreshTokenRequest);
         return ResponseEntity.ok(response);
@@ -98,14 +96,20 @@ public class AuthController {
     @PostMapping("/logout")
     @Operation(summary = "User logout", description = "Logout current user and invalidate tokens")
     @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "Logout successful"),
-        @ApiResponse(responseCode = "401", description = "Unauthorized")
+            @ApiResponse(responseCode = "200", description = "Logout successful"),
+            @ApiResponse(responseCode = "401", description = "Unauthorized")
     })
-    public ResponseEntity<MessageResponse> logout(@RequestHeader("Authorization") String token) {
+    public ResponseEntity<MessageResponse> logout(@RequestHeader("Authorization") String authHeader) {
         log.info("Logout request received");
-        // Extract user ID from token and logout
-        // This would typically be handled by Spring Security context
-        // For now, returning success message
+
+        // Extract JWT token from Authorization header
+        String jwt = extractTokenFromHeader(authHeader);
+
+        // Get user ID from token and call logout service
+        java.util.UUID userId = jwtTokenService.getUserIdFromToken(jwt);
+        authenticationService.logout(userId);
+
+        log.info("User {} logged out successfully", userId);
         return ResponseEntity.ok(new MessageResponse("Logged out successfully"));
     }
 
@@ -115,18 +119,18 @@ public class AuthController {
     @PostMapping("/forgot-password")
     @Operation(summary = "Forgot password", description = "Request password reset email")
     @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "Password reset email sent if account exists"),
-        @ApiResponse(responseCode = "429", description = "Too many requests")
+            @ApiResponse(responseCode = "200", description = "Password reset email sent if account exists"),
+            @ApiResponse(responseCode = "429", description = "Too many requests")
     })
     public ResponseEntity<MessageResponse> forgotPassword(
             @Valid @RequestBody @Parameter(description = "Email address") ForgotPasswordRequest request) {
-        
+
         log.info("Password reset requested for email: {}", request.getEmail());
         authenticationService.initiatePasswordReset(request.getEmail());
-        
+
         // Always return success to prevent email enumeration
         return ResponseEntity.ok(new MessageResponse(
-            "If an account exists with this email, a password reset link has been sent"));
+                "If an account exists with this email, a password reset link has been sent"));
     }
 
     /**
@@ -135,12 +139,12 @@ public class AuthController {
     @PostMapping("/reset-password")
     @Operation(summary = "Reset password", description = "Reset password using token from email")
     @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "Password reset successful"),
-        @ApiResponse(responseCode = "400", description = "Invalid or expired token")
+            @ApiResponse(responseCode = "200", description = "Password reset successful"),
+            @ApiResponse(responseCode = "400", description = "Invalid or expired token")
     })
     public ResponseEntity<MessageResponse> resetPassword(
             @Valid @RequestBody ResetPasswordRequest request) {
-        
+
         log.info("Password reset attempt with token");
         authenticationService.resetPasswordWithToken(request.getToken(), request.getNewPassword());
         return ResponseEntity.ok(new MessageResponse("Password has been reset successfully"));
@@ -152,8 +156,8 @@ public class AuthController {
     @GetMapping("/verify-email")
     @Operation(summary = "Verify email", description = "Verify email address using token")
     @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "Email verified successfully"),
-        @ApiResponse(responseCode = "400", description = "Invalid or expired token")
+            @ApiResponse(responseCode = "200", description = "Email verified successfully"),
+            @ApiResponse(responseCode = "400", description = "Invalid or expired token")
     })
     public ResponseEntity<MessageResponse> verifyEmail(@RequestParam String token) {
         log.info("Email verification attempt with token");
@@ -167,13 +171,13 @@ public class AuthController {
     @PostMapping("/resend-verification")
     @Operation(summary = "Resend verification email", description = "Resend email verification link")
     @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "Verification email sent"),
-        @ApiResponse(responseCode = "400", description = "Email already verified"),
-        @ApiResponse(responseCode = "429", description = "Too many requests")
+            @ApiResponse(responseCode = "200", description = "Verification email sent"),
+            @ApiResponse(responseCode = "400", description = "Email already verified"),
+            @ApiResponse(responseCode = "429", description = "Too many requests")
     })
     public ResponseEntity<MessageResponse> resendVerification(
             @Valid @RequestBody @Parameter(description = "Email address") ResendVerificationRequest request) {
-        
+
         log.info("Resend verification requested for email: {}", request.getEmail());
         authenticationService.resendVerificationEmail(request.getEmail());
         return ResponseEntity.ok(new MessageResponse("Verification email has been sent"));
@@ -185,15 +189,15 @@ public class AuthController {
     @GetMapping("/validate")
     @Operation(summary = "Validate token", description = "Check if access token is valid")
     @ApiResponses(value = {
-        @ApiResponse(responseCode = "200", description = "Token is valid"),
-        @ApiResponse(responseCode = "401", description = "Token is invalid or expired")
+            @ApiResponse(responseCode = "200", description = "Token is valid"),
+            @ApiResponse(responseCode = "401", description = "Token is invalid or expired")
     })
     public ResponseEntity<TokenValidationResponse> validateToken(
             @RequestHeader("Authorization") String authHeader) {
-        
+
         String token = extractTokenFromHeader(authHeader);
         boolean isValid = authenticationService.validateToken(token);
-        
+
         return ResponseEntity.ok(new TokenValidationResponse(isValid));
     }
 
@@ -246,11 +250,11 @@ public class AuthController {
     public static class ResetPasswordRequest {
         @jakarta.validation.constraints.NotBlank
         private String token;
-        
+
         @jakarta.validation.constraints.NotBlank
         @jakarta.validation.constraints.Size(min = 8)
         private String newPassword;
-        
+
         @jakarta.validation.constraints.NotBlank
         private String confirmPassword;
     }
