@@ -1,0 +1,182 @@
+services:
+  # ========================================
+  # PostgreSQL Database
+  # ========================================
+  postgres:
+    image: postgres:15
+    container_name: taskapp_postgres
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-taskapp}
+      POSTGRES_USER: ${POSTGRES_USER:-taskapp}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-taskapp123}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - taskapp-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-taskapp} -d ${POSTGRES_DB:-taskapp}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ========================================
+  # Redis Cache
+  # ========================================
+  redis:
+    image: redis:7-alpine
+    container_name: taskapp_redis
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-redis_dev_password_change_in_production}
+    command:
+      - redis-server
+      - --requirepass
+      - ${REDIS_PASSWORD:-redis_dev_password_change_in_production}
+      - --maxmemory
+      - 256mb
+      - --maxmemory-policy
+      - allkeys-lru
+      - --appendonly
+      - "no"
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - taskapp-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-redis_dev_password_change_in_production}", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
+  # ========================================
+  # TaskApp - Spring Boot Application
+  # ========================================
+  taskapp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: taskapp_backend
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      # Database Configuration (use service name, not localhost)
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${DB_USERNAME:-taskapp}
+      SPRING_DATASOURCE_USERNAME: ${DB_USERNAME:-taskapp}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-taskapp123}
+      SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.postgresql.Driver
+      
+      # Redis Configuration (use service name, not localhost)
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: 6379
+      SPRING_DATA_REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_dev_password_change_in_production}
+      
+      # Application Profile
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
+      
+      # JWT Configuration
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRATION: ${JWT_EXPIRATION:-3600000}
+      
+      # AWS S3 Configuration (using your .env variable names)
+      AWS_ACCESS_KEY: ${AWS_ACCESS_KEY}
+      AWS_SECRET_KEY: ${AWS_SECRET_KEY}
+      AWS_BUCKET_NAME: ${AWS_BUCKET_NAME}
+      AWS_REGION: ${AWS_REGION:-eu-north-1}
+      STORAGE_TYPE: ${STORAGE_TYPE:-S3}
+      
+      # AWS S3 properties (lowercase - for application code)
+      aws.s3.access-key: ${AWS_ACCESS_KEY}
+      aws.s3.secret-key: ${AWS_SECRET_KEY}
+      aws.s3.bucket-name: ${AWS_BUCKET_NAME}
+      aws.s3.region: ${AWS_REGION:-eu-north-1}
+      
+      # File Upload Configuration
+      APP_FILE_UPLOAD_MAX_FILE_SIZE: ${MAX_FILE_SIZE:-10485760}  # 10MB default
+      APP_FILE_UPLOAD_ALLOWED_EXTENSIONS: ${ALLOWED_EXTENSIONS:-jpg,jpeg,png,gif,pdf,doc,docx,xls,xlsx,txt,zip}
+      APP_FILE_UPLOAD_ALLOWED_MIME_TYPES: ${ALLOWED_MIME_TYPES:-image/jpeg,image/png,image/gif,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/plain,application/zip}
+      
+      # Email Configuration
+      SPRING_MAIL_HOST: ${MAIL_HOST:-smtp.gmail.com}
+      SPRING_MAIL_PORT: ${MAIL_PORT:-587}
+      SPRING_MAIL_USERNAME: ${MAIL_USERNAME}
+      SPRING_MAIL_PASSWORD: ${MAIL_PASSWORD}
+      
+      # Actuator Configuration
+      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,info
+      MANAGEMENT_ENDPOINT_HEALTH_SHOW_DETAILS: always
+    ports:
+      - "8080:8080"
+    volumes:
+      # Persistent log storage
+      - ./logs:/logs
+    networks:
+      - taskapp-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 90s
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  # ========================================
+  # pgAdmin (Optional - Development/Staging)
+  # ========================================
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: taskapp_pgadmin
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@taskapp.com}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin123}
+    ports:
+      - "5050:80"
+    networks:
+      - taskapp-network
+    depends_on:
+      - postgres
+    profiles:
+      - dev
+      - staging
+
+# ========================================
+# Networks
+# ========================================
+networks:
+  taskapp-network:
+    driver: bridge
+
+# ========================================
+# Volumes
+# ========================================
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local

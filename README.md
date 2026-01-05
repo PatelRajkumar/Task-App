@@ -462,6 +462,184 @@ The `docker-compose.yml` includes:
 
 ---
 
+## 🐳 Docker Deployment
+
+TaskApp is fully containerized and ready for production deployment using Docker Compose.
+
+### Quick Start with Docker
+
+**Prerequisites**:
+- Docker Engine 24+
+- Docker Compose V2
+- 4GB RAM minimum (8GB recommended)
+
+**Start the entire stack**:
+```bash
+# Build and start all services
+docker-compose up -d --build
+
+# View logs
+docker-compose logs -f taskapp
+
+# Check application health
+curl http://localhost:8080/actuator/health
+
+# Access Swagger UI
+open http://localhost:8080/swagger-ui.html
+```
+
+### Production Deployment
+
+**1. Prepare Environment**:
+Create a production `.env` file with your configuration:
+```env
+# Database
+POSTGRES_DB=taskapp
+POSTGRES_USER=taskapp
+POSTGRES_PASSWORD=<strong-password>
+
+# Redis
+REDIS_PASSWORD=<strong-redis-password>
+
+# Application
+SPRING_PROFILES_ACTIVE=prod
+
+# JWT
+JWT_SECRET=<256-bit-secret>
+JWT_EXPIRATION=3600000
+
+# AWS S3 (Required - S3-only storage)
+AWS_ACCESS_KEY_ID=<your-key>
+AWS_SECRET_ACCESS_KEY=<your-secret>
+AWS_S3_BUCKET_NAME=<bucket-name>
+AWS_REGION=us-east-1
+STORAGE_TYPE=S3
+
+# Email
+MAIL_HOST=smtp.gmail.com
+MAIL_PORT=587
+MAIL_USERNAME=<email>
+MAIL_PASSWORD=<app-password>
+
+# pgAdmin (optional)
+PGADMIN_EMAIL=admin@taskapp.com
+PGADMIN_PASSWORD=<admin-password>
+```
+
+**2. Deploy Stack**:
+```bash
+# Build and start (production mode)
+docker-compose up -d --build
+
+# View all services status
+docker-compose ps
+
+# Check application logs
+docker-compose logs -f taskapp
+
+# Database migrations (automatic on startup via Flyway)
+docker-compose logs taskapp | grep -i flyway
+```
+
+**3. Verify Deployment**:
+```bash
+# Health check
+curl http://localhost:8080/actuator/health
+
+# Check all containers are healthy
+docker ps
+
+# View resource usage
+docker stats
+```
+
+### Docker Architecture
+
+- **Multi-stage build**: Maven build stage + lightweight JRE runtime
+- **Image size**: ~200-300MB (optimized)
+- **Non-root user**: Application runs as `taskapp` user for security
+- **Health checks**: All services include health monitoring
+- **Persistent volumes**:
+  - `postgres_data` - Database persistence
+  - `redis_data` - Cache persistence
+  - `./logs` - Application logs (bind mount)
+
+### Useful Docker Commands
+
+```bash
+# Restart application only
+docker-compose restart taskapp
+
+# Update to new version
+git pull
+docker-compose up -d --build taskapp
+
+# View logs (specific service)
+docker-compose logs -f postgres
+docker-compose logs -f redis
+
+# Stop all services
+docker-compose down
+
+# Stop and remove volumes (WARNING: deletes data)
+docker-compose down -v
+
+# Database backup
+docker exec taskapp_postgres pg_dump -U taskapp taskapp > backup.sql
+
+# Database restore
+docker exec -i taskapp_postgres psql -U taskapp taskapp < backup.sql
+
+# Access Redis CLI
+docker exec -it taskapp_redis redis-cli -a <redis-password>
+
+# Shell into application container
+docker exec -it taskapp_backend sh
+```
+
+### Resource Requirements
+
+**Minimum (Development)**:
+- 2 CPU cores
+- 4GB RAM
+- 20GB disk
+
+**Recommended (Production)**:
+- 4 CPU cores
+- 8GB RAM
+- 50GB disk (with room for logs and backups)
+
+**Container Limits** (configured in docker-compose.yml):
+- **taskapp**: 1GB RAM, 1 CPU
+- **postgres**: Default (configure as needed)
+- **redis**: 256MB cache limit
+
+### Production Considerations
+
+**SSL/TLS**: For production, use a reverse proxy (Nginx or Traefik) for HTTPS termination:
+```bash
+# Example with Nginx
+nginx -> https://yourdomain.com -> http://taskapp:8080
+```
+
+**Monitoring**: Add monitoring stack (Prometheus, Grafana) or use cloud monitoring:
+- Health checks via `/actuator/health`
+- Application metrics via Spring Boot Actuator
+- Container metrics via `docker stats`
+
+**Backups**:
+- Database: Schedule regular `pg_dump` backups
+- Logs: Rotate and archive from `./logs` directory
+- Environment: Securely backup `.env` file
+
+**Scaling**: For horizontal scaling, consider:
+- Load balancer in front of multiple app instances
+- External PostgreSQL (AWS RDS, managed database)
+- External Redis (AWS ElastiCache, managed cache)
+- Container orchestration (Kubernetes, AWS ECS)
+
+---
+
 ## ⚙️ Configuration
 
 ### Application Profiles
